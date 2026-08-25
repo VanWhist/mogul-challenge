@@ -1,0 +1,2526 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MOGUL CHALLENGE — Playable Run (STEP 3)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0;padding:0;height:100%;overflow:hidden;background:#0b1220;
+    font-family:"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    -webkit-user-select:none;user-select:none;
+  }
+  /* 論理幅を固定し、高さは端末比率に追従（§4）。PC では 9:16 で中央寄せ */
+  #stage{
+    position:relative;margin:0 auto;overflow:hidden;background:#eaf3fb;touch-action:none;
+    height:100vh;  height:100dvh;
+    width:min(100vw, calc(100vh * 9 / 16));
+    width:min(100vw, calc(100dvh * 9 / 16));
+    box-shadow:0 0 40px rgba(0,0,0,.55);
+  }
+  canvas{position:absolute;inset:0;display:block;}
+
+  .hud{position:absolute;pointer-events:none;color:#0d1b2a;}
+  .hud b{font-variant-numeric:tabular-nums;}
+
+  /* --- 上段: 計測タイム / COMBO / SPEED・BALANCE --- */
+  #topbar{top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;
+    padding:8px 10px;gap:6px;}
+  .card{background:rgba(255,255,255,.78);border:1px solid rgba(13,27,42,.12);border-radius:8px;
+    padding:5px 8px;backdrop-filter:blur(2px);}
+  .lbl{font-size:9px;letter-spacing:.16em;color:#5b7186;display:block;line-height:1.3;}
+  #elapsed{font-size:17px;font-weight:800;line-height:1.1;}
+  #rightcol{display:flex;flex-direction:column;gap:5px;}
+  #speedBox{min-width:104px;text-align:right;}
+  #speedVal{font-size:17px;font-weight:800;line-height:1.1;}
+  #speedBarOuter{margin-top:4px;height:5px;border-radius:3px;background:rgba(13,27,42,.14);overflow:hidden;}
+  #speedBar{height:100%;width:40%;background:linear-gradient(90deg,#3fa9ff,#0b6fd0);border-radius:3px;
+    transition:width .08s linear;}
+
+  /* BALANCE（§14）と COMBO（§16） */
+  #balanceBox{min-width:104px;text-align:right;}
+  #balanceVal{font-size:15px;font-weight:800;line-height:1.1;}
+  #balanceBarOuter{margin-top:4px;height:5px;border-radius:3px;background:rgba(13,27,42,.14);overflow:hidden;}
+  #balanceBar{height:100%;width:100%;background:#2fa36b;border-radius:3px;
+    transition:width .12s linear, background-color .2s linear;}
+  #comboBox{text-align:center;min-width:52px;}
+  #comboVal{font-size:17px;font-weight:800;line-height:1.1;color:#9aa9b8;}
+  #comboVal.on{color:#0f8a5f;}
+  #fallTag{display:none;margin-top:3px;font-size:8px;font-weight:800;letter-spacing:.12em;color:#c0392b;}
+  #fallTag.on{display:block;}
+
+  /* --- 判定カウンター --- */
+  #counters{top:74px;left:10px;display:grid;grid-template-columns:repeat(3,auto);gap:3px 12px;
+    font-size:9px;line-height:1.25;padding:6px 9px;}
+  #counters .row{display:flex;flex-direction:column;align-items:flex-start;}
+  #counters .k{letter-spacing:.06em;color:#41586d;font-size:8px;}
+  #counters .v{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .k-perfect{color:#0f8a5f!important;}
+  .k-good{color:#1667c8!important;}
+  .k-ok{color:#7a6a1f!important;}
+  .k-miss{color:#c0392b!important;}
+  .k-major{color:#8e1b10!important;}
+  .k-whiff{color:#6b5b8a!important;}
+
+  /* --- 判定表示 --- */
+  /* 判定表示は TURN JUDGE LINE の「下」に出す。上に出すと、これから来るコブを覆うため */
+  #judgeText{left:0;right:0;top:0;text-align:center;font-size:25px;font-weight:900;
+    letter-spacing:.08em;opacity:0;}
+  #judgeText.show{animation:pop .5s ease-out forwards;}
+  @keyframes pop{
+    0%{opacity:0;transform:scale(.7);}
+    18%{opacity:1;transform:scale(1.14);}
+    45%{opacity:1;transform:scale(1);}
+    100%{opacity:0;transform:scale(1);}
+  }
+  .r-perfect{color:#0f8a5f;text-shadow:0 2px 10px rgba(255,255,255,.9);}
+  .r-good{color:#1667c8;text-shadow:0 2px 10px rgba(255,255,255,.9);}
+  .r-ok{color:#8a7620;text-shadow:0 2px 10px rgba(255,255,255,.9);}
+  .r-miss{color:#c0392b;text-shadow:0 2px 10px rgba(255,255,255,.9);}
+  .r-whiff{color:#6b5b8a;font-size:16px;text-shadow:0 2px 10px rgba(255,255,255,.9);}
+  .r-fall{color:#8e1b10;font-size:27px;text-shadow:0 2px 10px rgba(255,255,255,.95);}
+  .r-finish{color:#0b4f8a;font-size:30px;text-shadow:0 2px 12px rgba(255,255,255,.95);}
+
+  /* --- 進行バー（§19.2 現在地が分かること）--- */
+  #progress{order:0;padding:5px 9px 6px;background:rgba(255,255,255,.9);
+    border-top:1px solid rgba(13,27,42,.10);}
+  #progRow{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:9px;letter-spacing:.06em;color:#41586d;margin-bottom:3px;}
+  #progLeft b{font-size:11px;}
+  #progLeft.air{color:#0b6fd0;font-weight:800;}
+  #progBarOuter{position:relative;height:7px;border-radius:4px;background:rgba(13,27,42,.13);
+    overflow:hidden;}
+  .progAir{position:absolute;top:0;bottom:0;background:rgba(11,111,208,.28);}
+  #progBar{position:absolute;top:0;bottom:0;left:0;width:0%;background:#0f8a5f;border-radius:4px;}
+
+  /* --- オーバーレイ（スタート／リザルト）--- */
+  .overlay{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:18px 14px;
+    background:rgba(8,20,34,.94);color:#eaf3fb;pointer-events:auto;overflow-y:auto;}
+  .overlay.hidden{display:none;}
+  #startOverlay .resRow{width:186px;}
+  /* 難易度選択（§7.4 / §19.2） */
+  .diffLbl{font-size:9px;letter-spacing:.18em;color:#8fb4d4;margin-bottom:6px;}
+  #diffRow{display:flex;gap:6px;margin-bottom:7px;}
+  .diffbtn{appearance:none;border:1px solid rgba(143,180,212,.45);background:transparent;
+    color:#b9d2e6;font-size:11px;font-weight:700;letter-spacing:.10em;padding:8px 14px;
+    border-radius:999px;cursor:pointer;font-family:inherit;}
+  .diffbtn.on{background:#2f9bff;border-color:#2f9bff;color:#fff;}
+  .diffNote{font-size:9px;color:#5f88ab;margin-bottom:6px;letter-spacing:.04em;height:12px;}
+  /* リピート警告（§18.3）。選択は禁止せず、情報として出す */
+  #repeatWarn{font-size:9px;font-weight:800;letter-spacing:.04em;color:#e0a33a;
+    margin-bottom:10px;height:12px;}
+  #repeatWarn:empty{margin-bottom:4px;}
+  /* 技の事前選択（§17.2） */
+  .trickRow{display:flex;gap:5px;margin-bottom:5px;}
+  .trickbtn{appearance:none;border:1px solid rgba(143,180,212,.45);background:transparent;
+    color:#b9d2e6;font-size:10px;font-weight:700;letter-spacing:.06em;padding:8px 10px;
+    border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .trickbtn.on{background:#2f9bff;border-color:#2f9bff;color:#fff;}
+  /* エア進入表示（§17.3 APPROACH）。操作ボタンやタイミングバーは出さない */
+  #airInfo{position:absolute;left:0;right:0;top:27%;z-index:3;text-align:center;
+    pointer-events:none;}
+  #airInfoMain{opacity:0;transition:opacity .18s linear;}
+  #airInfoMain.on{opacity:1;}
+  #airInfo .ai1{font-size:10px;letter-spacing:.22em;color:#0b6fd0;font-weight:800;}
+  #airInfo .ai2{font-size:22px;letter-spacing:.06em;color:#0b4f8a;font-weight:900;
+    text-shadow:0 2px 10px rgba(255,255,255,.95);}
+  #airInfo .ai3{font-size:10px;letter-spacing:.14em;color:#3d7ba8;font-weight:700;}
+  /* セット判定（§17.3.2）。大きい判定テキスト（showJudge）は使わない。飛行の読みを邪魔しないため */
+  #setInfo{margin-top:6px;font-size:11px;font-weight:800;letter-spacing:.16em;
+    opacity:0;transition:opacity .18s linear;text-shadow:0 1px 8px rgba(255,255,255,.95);}
+  #setInfo.on{opacity:1;}
+  #setInfo.s-perfect{color:#0f8a5f;}
+  #setInfo.s-good{color:#1667c8;}
+  #setInfo.s-none{color:#a2564a;}
+  .ovTitle{font-size:20px;font-weight:900;letter-spacing:.16em;margin-bottom:4px;}
+  .ovSub{font-size:10px;letter-spacing:.14em;color:#8fb4d4;margin-bottom:16px;}
+  .bigbtn{appearance:none;border:0;background:#2f9bff;color:#fff;font-weight:900;
+    letter-spacing:.18em;font-size:13px;padding:12px 34px;border-radius:999px;cursor:pointer;
+    font-family:inherit;margin-top:16px;}
+  .bigbtn:active{background:#1a7fd8;}
+
+  /* カウントダウンはコースを隠さない（背景なし） */
+  #countdown{position:absolute;left:0;right:0;top:38%;z-index:4;text-align:center;
+    font-size:56px;font-weight:900;color:#0b4f8a;pointer-events:none;
+    text-shadow:0 3px 16px rgba(255,255,255,.95);}
+  #countdown.hidden{display:none;}
+
+  /* --- リザルト --- */
+  #resCard{width:100%;max-width:300px;}
+  .resTime{font-size:12px;letter-spacing:.14em;color:#8fb4d4;}
+  .resTimeV{font-size:30px;font-weight:900;line-height:1.1;margin-bottom:12px;}
+  .resScoreV{font-size:44px;font-weight:900;line-height:1;color:#7fe0b0;}
+  .resScoreMax{font-size:13px;color:#8fb4d4;font-weight:700;}
+  .resSec{margin-top:14px;border-top:1px solid rgba(143,180,212,.28);padding-top:9px;}
+  .resRow{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:11px;line-height:1.9;}
+  .resRow .rk{color:#b9d2e6;}
+  .resRow .rv{font-variant-numeric:tabular-nums;font-weight:700;}
+  .resRow .rp{color:#7fb2dd;font-size:10px;min-width:52px;text-align:right;}
+  .resSmall{font-size:10px;color:#8fb4d4;line-height:1.8;margin-top:6px;}
+  .resNote{font-size:9px;color:#5f88ab;margin-top:10px;letter-spacing:.06em;}
+  .resSecTitle{font-size:9px;letter-spacing:.16em;color:#5f88ab;margin-top:12px;text-align:left;}
+  /* 縦の短い画面ではリザルトを詰める。RETRY をスクロールなしで押せるようにするため（§19.1）*/
+  #stage.shortres .ovTitle{font-size:17px;margin-bottom:2px;}
+  #stage.shortres .resScoreV{font-size:32px;}
+  #stage.shortres .resRow{line-height:1.55;}
+  #stage.shortres .resSec{margin-top:9px;padding-top:6px;}
+  #stage.shortres .resSecTitle{margin-top:7px;}
+  #stage.shortres .resSmall{line-height:1.55;}
+  #stage.shortres .bigbtn{padding:9px 30px;margin-top:10px;}
+  #stage.shortres .ovSub{margin-bottom:8px;}
+  #stage.shortres .resNote{margin-top:6px;}
+  #resRepeat{color:#e0a33a;}
+  #resRepeat:empty{display:none;}
+
+  /* --- 画面下部（操作バー＋デバッグ）。縦に積むので重ならない --- */
+  #bottom{left:0;right:0;bottom:0;display:flex;flex-direction:column;}
+  #controls{display:flex;align-items:center;justify-content:space-between;gap:6px;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));
+    background:rgba(255,255,255,.86);border-top:1px solid rgba(13,27,42,.10);
+    pointer-events:auto;order:2;}
+  /* 狭い画面ではヒントを縮めてボタンを守る（§19.1 はみ出し禁止） */
+  #hint{font-size:9px;letter-spacing:.06em;color:#5b7186;white-space:nowrap;
+    flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  #btnrow{display:flex;gap:5px;flex:0 0 auto;}
+  button{appearance:none;border:1px solid rgba(13,27,42,.18);background:rgba(255,255,255,.9);
+    color:#0d1b2a;font-size:9px;font-weight:700;letter-spacing:.08em;padding:6px 9px;
+    border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  button:active{background:#dcebf9;}
+
+  /* --- デバッグ --- */
+  /* 横スクロールにすると狭い画面で末尾が読めなくなるので折り返す（§19 デバッグ表示は必須） */
+  #debug{order:1;padding:6px 9px;background:rgba(9,20,32,.86);color:#c9dcec;
+    font-size:9.5px;line-height:1.55;font-family:"SF Mono",Consolas,Menlo,monospace;
+    white-space:normal;overflow:hidden;}
+  #debug.hidden{display:none;}
+  #debug .t{color:#7fc6ff;letter-spacing:.1em;}
+  #debug .warn{color:#ff8b7a;white-space:normal;}
+  #debug em{color:#ffd479;font-style:normal;}
+
+  /* 論理幅ではなくステージの実寸で切り替える（PC でも縦長にすると狭くなるため）。
+     narrow クラスは resize() が付け外しする */
+  #stage.narrow #hint{display:none;}
+  #stage.narrow #debug{font-size:8.5px;line-height:1.45;}
+  #stage.narrow #progRow{font-size:8px;}
+  #stage.narrow #judgeText{font-size:19px;}   /* 判定表示を下部 HUD に重ねないため */
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div class="hud" id="topbar">
+    <div class="card"><span class="lbl">TIME</span><b id="elapsed">0.00</b></div>
+    <div class="card" id="comboBox"><span class="lbl">COMBO</span><b id="comboVal">0</b></div>
+    <div id="rightcol">
+      <div class="card" id="speedBox">
+        <span class="lbl">SPEED</span><b id="speedVal">1.00</b>
+        <div id="speedBarOuter"><div id="speedBar"></div></div>
+      </div>
+      <div class="card" id="balanceBox">
+        <span class="lbl">BALANCE</span><b id="balanceVal">100</b>
+        <div id="balanceBarOuter"><div id="balanceBar"></div></div>
+        <div id="fallTag">DOWN</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud card" id="counters">
+    <div class="row"><span class="k k-perfect">PERFECT</span><span class="v" id="cPerfect">0</span></div>
+    <div class="row"><span class="k k-good">GOOD</span><span class="v" id="cGood">0</span></div>
+    <div class="row"><span class="k k-ok">OK</span><span class="v" id="cOk">0</span></div>
+    <div class="row"><span class="k k-miss">MISS</span><span class="v" id="cMiss">0</span></div>
+    <div class="row"><span class="k k-major">MAJOR</span><span class="v" id="cMajor">0</span></div>
+    <div class="row"><span class="k k-whiff">WHIFF</span><span class="v" id="cWhiff">0</span></div>
+  </div>
+
+  <div class="hud" id="judgeText"></div>
+
+  <div id="countdown" class="hidden"></div>
+
+  <div id="airInfo">
+    <div id="airInfoMain">
+      <div class="ai1" id="airInfoNo">AIR 1</div>
+      <div class="ai2" id="airInfoTrick">360</div>
+      <div class="ai3" id="airInfoDd">DD 0.68</div>
+    </div>
+    <div class="ai4" id="setInfo"></div>
+  </div>
+
+  <div class="hud" id="bottom">
+    <div id="progress">
+      <div id="progRow">
+        <span id="progLeft">残り <b id="progLeftV">60</b> コブ</span>
+        <span id="progRight">0%</span>
+      </div>
+      <div id="progBarOuter"><div id="progBar"></div></div>
+    </div>
+    <div id="debug"></div>
+    <div id="controls">
+      <span id="hint">← / A ・ → / D ／ 画面左右タップ</span>
+      <span id="btnrow">
+        <button id="btnWindows" type="button">窓 OFF</button>
+        <button id="btnDebug" type="button">DEBUG ON</button>
+        <button id="btnRestart" type="button">RESTART</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="ovTitle">MOGUL CHALLENGE</div>
+    <div class="ovSub">PLAYABLE RUN</div>
+    <div class="diffLbl">難易度</div>
+    <div id="diffRow">
+      <button class="diffbtn" type="button" data-diff="beginner">初級</button>
+      <button class="diffbtn" type="button" data-diff="intermediate">中級</button>
+      <button class="diffbtn" type="button" data-diff="advanced">上級</button>
+    </div>
+    <div class="diffNote" id="diffNote"></div>
+    <div class="diffLbl">AIR 1 の技</div>
+    <div class="trickRow" data-air="1">
+      <button class="trickbtn" type="button" data-air="1" data-trick="360">360</button>
+      <button class="trickbtn" type="button" data-air="1" data-trick="backFull">BACK FULL</button>
+      <button class="trickbtn" type="button" data-air="1" data-trick="cork720">CORK 720</button>
+    </div>
+    <div class="diffLbl" style="margin-top:7px">AIR 2 の技</div>
+    <div class="trickRow" data-air="2">
+      <button class="trickbtn" type="button" data-air="2" data-trick="360">360</button>
+      <button class="trickbtn" type="button" data-air="2" data-trick="backFull">BACK FULL</button>
+      <button class="trickbtn" type="button" data-air="2" data-trick="cork720">CORK 720</button>
+    </div>
+    <div class="diffNote" id="trickNote"></div>
+    <div id="repeatWarn"></div>
+    <div class="resRow"><span class="rk">COURSE</span><span class="rv" id="ovCourse">253 m</span></div>
+    <div class="resRow"><span class="rk">TURNS</span><span class="rv" id="ovTurns">56</span></div>
+    <div class="resRow"><span class="rk">AIR</span><span class="rv" id="ovAir">20 m × 2</span></div>
+    <button class="bigbtn" id="btnStart" type="button">START</button>
+    <div class="resNote">← / A ・ → / D ／ 画面左右タップ</div>
+  </div>
+
+  <div class="overlay hidden" id="resultOverlay">
+    <div id="resCard">
+      <div class="ovTitle">RESULT</div>
+      <div class="ovSub" id="resDiff">上級</div>
+      <div class="resTime">TOTAL SCORE</div>
+      <div><span class="resScoreV" id="resTotal">0.00</span><span class="resScoreMax"> / <span id="resTotalMax">100</span></span></div>
+      <div class="resSec">
+        <div class="resRow"><span class="rk">TURN</span><span class="rv" id="resScore">0.0</span><span class="rp">/ 60</span></div>
+        <div class="resRow"><span class="rk">AIR</span><span class="rv" id="resAirScore">0.0</span><span class="rp">/ 20</span></div>
+        <div class="resRow"><span class="rk">TIME <em style="color:#5f88ab" id="resTime">0.00</em>s</span>
+          <span class="rv" id="resTimeScore">0.0</span><span class="rp">/ 20</span></div>
+      </div>
+      <div class="resSecTitle">TURN の内訳</div>
+
+      <div class="resSec">
+        <div class="resRow"><span class="rk">カービング <em style="color:#5f88ab">50%</em></span>
+          <span class="rv" id="resCarve">0.00</span><span class="rp" id="resCarveP">0.0</span></div>
+        <div class="resRow"><span class="rk">吸収・伸展 <em style="color:#5f88ab">25%</em></span>
+          <span class="rv" id="resAbsorb">0.00</span><span class="rp" id="resAbsorbP">0.0</span></div>
+        <div class="resRow"><span class="rk">上体 <em style="color:#5f88ab">25%</em></span>
+          <span class="rv" id="resUpper">0.00</span><span class="rp" id="resUpperP">0.0</span></div>
+        <div class="resRow"><span class="rk">基礎点</span><span class="rv" id="resBase">0.0</span><span class="rp"></span></div>
+        <div class="resRow"><span class="rk">減点（転倒 <span id="resFalls">0</span>）</span>
+          <span class="rv" id="resPenalty">0.0</span><span class="rp"></span></div>
+      </div>
+
+      <div class="resSecTitle">AIR の内訳</div>
+      <div class="resSec">
+        <div class="resSmall" id="resAir"></div>
+        <div class="resSmall" id="resRepeat"></div>
+      </div>
+
+      <div class="resSec">
+        <div class="resSmall" id="resCounts"></div>
+        <div class="resSmall" id="resExtra"></div>
+      </div>
+
+      <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
+      <div class="resNote">TURN 60 ＋ AIR 20 ＋ TIME 20 ＝ 100（現在の技での最大は 97.6）</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* =========================================================================
+   CONFIG
+   前半は GAME_SPEC.md §23 の初期値そのまま。
+   後半は §23 に無い実装・描画用の定数（判定バランスには影響しない）。
+   ========================================================================= */
+var CONFIG = {
+  // ---- コース ----
+  baseTurnInterval: 0.55,   // speed=1.0 での基準ターン間隔（秒）
+  baseScroll:       210,    // speed=1.0 のスクロール速度（px/秒）
+  gapJitter:        0.10,   // コブ間隔の揺らぎ（±比率）
+  courseSeed:       12345,  // コース生成の乱数シード。同じ値なら同じコブ配置
+  mogulOffsetX:     56,     // センターからのコブの左右オフセット(px)
+  judgeLineY:       0.72,   // TURN JUDGE LINE の縦位置（画面高さに対する比率）
+
+  // ---- 判定（基準間隔 gapPx に対する比率。local gap ではない）----
+  perfectWindow: 0.14,
+  goodWindow:    0.26,
+  okWindow:      0.36,
+  targetSegment: 0.40,      // 担当区間。okWindow < targetSegment <= (1-jitterAmp)/2。v3.1 で 0.45→0.40
+
+  // ---- 空振り ----
+  whiffSpeedLoss: 0.03,
+  inputLock:      0.11,     // 秒
+
+  // ---- 速度 ----
+  startSpeed: 1.00,
+  minSpeed:   0.65,
+  maxSpeed:   1.50,
+  perfectSpeedGain:   0.035,
+  goodSpeedGain:      0.020,
+  okSpeedGain:        0.000,
+  missSpeedLoss:      0.080,
+  majorMissSpeedLoss: 0.080,
+  gainFalloff:     true,    // 加速の逓減
+  clampGainFactor: true,    // 逓減係数を1.0で上限クリップ
+
+  // ---- 選手の横移動（視覚のみ）----
+  playerOffsetX: 28,        // ターン時の足の左右振り幅(px)。上体はほとんど動かない
+  playerLerp:    11,        // 横移動の追従の速さ（大きいほど機敏）
+  // 入力が途切れたらニュートラル（中央）へ戻す（§13.1(4)）。描画のみ
+  neutralIdleTurns:  2.0,   // 基準ターン間隔の何倍の無入力で「ターンしていない」とみなすか
+  neutralReturnTime: 0.35,  // 中央へ戻すのにかける秒数
+
+  // ---- 選手の反応（すべて視覚表現。判定には一切使わない）----
+  upperBodyFixed:   true,   // 上体をフォールライン側に固定し、脚だけ振る
+  torsoFollow:      0.10,   // 上体が横移動に追従する割合（0=完全固定）
+  hipFollow:        0.22,   // 腰が横移動に追従する割合
+  absorbEnabled:    true,   // コブの吸収（脚を畳む）
+  hipHeight:        27,     // 伸びた状態の腰の高さ(px)。吸収の余白を決める
+  absorbDepth:      17,     // コブの上で腰が沈む最大量(px)
+  absorbExtend:     0.38,   // 伸び上がる量（absorbDepth に対する比率）
+  absorbFollowsInput: true, // true=タップした瞬間に吸収する / false=コブの位置だけで吸収する
+  absorbCycle:      0.85,   // 吸収サイクルの長さ（コブ間隔に対する比率）
+  absorbRange:      0.42,   // absorbFollowsInput=false のときだけ使う
+  kneeOut:          7,      // 吸収時に膝が外へ開く量(px)
+  kneeUp:           5,      // 吸収時に膝が持ち上がる量(px)
+  absorbLerp:       40,     // 畳み込みの鋭さ。大きいほど「ドン」と入る
+  buckHeight:       9,      // MISS 時に突き上げられる量(px)
+  buckDecay:        7,      // 突き上げの収まりの速さ
+  edgeAngle:        0.26,   // スキーのエッジング角(rad)
+  // 「乱れ」= フォールラインからの横揺れ。§14.1 により BALANCE から導出する。
+  // 独立した蓄積量は持たない（disturb = 1 − BALANCE/100）
+  // ターンの左右振りとは別の、ゆっくりした周期にしてある（同じ周期だと見分けがつかない）
+  lineDriftEnabled: true,
+  lineDriftMax:     30,     // 乱れ最大時（BALANCE 0）の横揺れ幅(px)
+  lineWanderFreq:   3.4,    // 横揺れの周期(rad/s)。ターン(約12rad/s)より十分ゆっくり
+  lineLerp:         5,      // 乱れ量の追従の速さ
+
+  // ---- BALANCE / 転倒 / COMBO（§14〜§16）----
+  startBalance:           100,
+  missBalanceLoss:         15,
+  majorMissBalanceLoss:    25,
+  perfectBalanceRecovery:   4,
+  goodBalanceRecovery:      2,
+  fallStopTime:           1.0,
+  fallBalanceReset:        70,
+  // ↓ §23 に無い。§15「BALANCE が低いと速度が上がりにくい」「大きく減速」を数値化したもの
+  balanceAffectsGain: true, // false にすると STEP 1 と同じ加速に戻る
+  balanceGainFloor:   0.35, // BALANCE 0 のときの加速倍率（BALANCE 100 で 1.0）
+  fallSpeedLoss:      0.30, // 転倒時の減速量（固定量。逓減しない）
+
+  // ---- STEP 3（Playable Run）----
+  // コース生成（§7.3。本数は決め打たず、ICR の割合から生成する）
+  pxPerMeter:        33,    // 縦スケール。1 m あたりの px。115.5px = 3.5m から算出
+  pxPerMeterX:     22.9,    // 横スケール。コブの見た目の直径 80px = 3.5m から算出（§7.3）
+  courseLengthM:    253,    // CL。スタート〜フィニッシュ。規格 235±35m
+  mogulSpacingM:    3.5,    // コブ間隔(m)
+  airZoneM:          20,    // エア区間の長さ(m)。LZ 15.0m + JL 4〜5m。×2 箇所
+  air1PctOfCL:     0.15,    // 第1エアの踏切位置（スタートから CL の何割か）
+  air2PctOfCL:     0.20,    // 第2エアの踏切位置（フィニッシュから CL の何割か）
+  gateSpacingPctOfCL: 0.10, // CF。コントロールゲート間隔は CL の 1/10（§20.1 の規格値）
+  runOutGaps:         2,    // フィニッシュ手前、この本数ぶんの位置にはコブを置かない
+
+  // 難易度（§7.4）。揺らぎを「かける区間」と「幅」の両方で変える（v3.1 で幅も可変に）
+  difficulty: 'advanced',   // 'beginner' | 'intermediate' | 'advanced'
+  jitterSections: {
+    beginner:     { upper: false, middle: false, lower: false },
+    intermediate: { upper: false, middle: true,  lower: false },
+    advanced:     { upper: true,  middle: true,  lower: true  }
+  },
+  // 揺らぎの幅。難易度に無い場合は gapJitter を使う。
+  // 上級 0.20 で間隔 2.87〜3.98m（実際のコースは 2.5〜4.0m）
+  jitterAmp: { beginner: 0.00, intermediate: 0.12, advanced: 0.20 },
+
+  // 採点（§18.2 で確定）
+  turnScoreMax:      60,
+  carveWeight: { perfect: 1.00, good: 0.75, ok: 0.40, miss: 0.10, majorMiss: 0.00 },
+  // 吸収・伸展（連続性）の重み。carveWeight とは別物。§18.2(2)
+  chainWeight: { perfect: 1.00, good: 1.00, ok: 0.50, miss: 0.00, majorMiss: 0.00 },
+  balanceScoreFloor: 40,    // 平均BALANCE がこの値以下なら上体スコア 0
+  deductFall:       4.1,    // FIS Complete fall（4.1〜5.9）の下限
+  deductStop:       6.0,    // FIS Complete stop。STEP 3 では発生しない
+  penaltyScale:     2.0,    // ハンドブックの 20 点満点 → 本ゲーム 60 点満点への換算。FIS 忠実なら 3.0
+  // エアの転倒をターンの転倒の何倍として数えるか（§18.2(4)）。
+  // FIS はエア後の転倒を Turns にも反映するが、AIR と TIME で既に大きく失っているので半分にする。
+  // ★これは FIS 忠実ではなく、三重の罰を避けるための意図的なゲーム補正
+  airFallWeight:    0.5,
+
+  // ---- 採点の残り（§18.3〜18.5）。v4.0 で確定 ----
+  airScoreMax:     20,      // AIR SCORE の上限。いまの 3 技での最大は 17.6（Back Full ＋ Cork 720）
+  // ★同じ技を 2 本跳んだら 2 本目はカウントしない（FIS Judging Handbook 6204.3.8）。
+  //   減価係数は置かない。CASUAL MODE を作るときだけ 0.70 を使う
+  airRepeatCounts: false,
+  // TIME SCORE（§18.4）。v4.2 で FIS のペースタイム方式に変更。
+  //   paceTime = courseLengthM / paceSpeed（★秒数を直接書かない。コース長に追従させる）
+  //   TIME SCORE = clamp(paceScoreBase − paceScoreSlope × T / paceTime, 0, timeScoreMax)
+  //   ペースタイムちょうどで 16 点／0.875 倍で 20 点／1.5 倍で 0 点
+  timeScoreMax:    20,
+  // ★基準速度はゲーム用の値。FIS の男子 10.30 m/s をそのまま使うと、CL 253m のペースタイムが
+  //   24.56 秒になり、本ゲームの完璧なラン 29.71 秒（8.51 m/s）でも 9 点にしかならない
+  paceSpeed:       7.3,     // m/s。ペースタイム = 253 / 7.3 = 34.66 秒
+  paceScoreBase:    48,     // FIS の式の定数。48 − 32 ×（タイム / ペースタイム）
+  paceScoreSlope:   32,
+  totalScoreMax:  100,      // TURN 60 ＋ AIR 20 ＋ TIME 20。★100 に正規化しないこと
+
+  // ---- STEP 4（AIR 1）----
+  // 技（§17.1）。DD は FIS 公式 Degree of Difficulty 表（2023-11 男子）に準拠。
+  // Back Full と Cork 720 は同格（どちらも 0.88）。Cork を「一番難しい技」にしないこと
+  airTricks: {
+    '360':      { label:'360',       code:'3',   dd:0.68 },
+    'backFull': { label:'BACK FULL', code:'bF',  dd:0.88 },
+    'cork720':  { label:'CORK 720',  code:'7op', dd:0.88 }
+  },
+  selectedAir1: '360',      // 事前選択（§17.2）。滑走中は変更しない
+  selectedAir2: 'backFull', // v4.0 で '360'→'backFull'。既定のままでもリピートにならないように（§18.3）
+
+  // 着地判定窓（ミリ秒。§17.4）。★この判定だけは時間基準。ターン判定の距離比率方式とは別物。
+  // Cork 720 だけ狭くしないこと（Back Full と DD が同じなので選択が意味を失う）
+  airLandWindows: {
+    '360':      { perfect:140, good:240, recover:340 },
+    'backFull': { perfect:110, good:200, recover:290 },
+    'cork720':  { perfect:110, good:200, recover:290 }
+  },
+  airMissHorizon: 2.0,      // recover の何倍まで待つか。ここまで無入力なら FALL
+
+  // セットポジション入力（§17.3.2）。★判定は ms ではなく距離(m)。§8.1 に合わせる。
+  // 技によって窓を変えない（セットは技の難易度と無関係）
+  airSetIdealM:    2,       // 理想の位置＝リップの何 m 手前か
+  airSetPerfectM: 0.8,      // PERFECT SET の窓（理想位置からのずれ・m）
+  airSetGoodM:    1.6,      // GOOD SET の窓（m）
+  airSetFactor: { perfect: 1.00, good: 0.95, none: 0.85 },  // Quality への係数（加重平均にしない）
+  airSetCenterTime: 0.30,   // ニュートラルへ戻すのにかける時間(秒。描画のみ)
+
+  // Quality 0〜10（§17.5）。FIS の評価レンジに合わせる
+  airQualityBands: {
+    perfect: [8.1, 10.0],   // Excellent
+    good:    [6.1,  8.0],   // Good
+    deep:    [4.1,  6.0],   // Adequate
+    miss:    [2.1,  4.0],   // Managing
+    fall:    [0.1,  2.0]    // Poor
+  },
+
+  // 失敗の波及（§17.6）。人工的な減点は足さず、着地後の滑りへ効かせる
+  airMissSpeedLoss:   { '360':0.06, backFull:0.12, cork720:0.12 },
+  airMissBalanceLoss: { '360':10,   backFull:20,   cork720:20 },
+
+  /* ======== ここから下は §23 に無い実装・描画用（判定バランス非依存）======== */
+  // エア区間 20m の内訳（m）。§7.3 の区間長は変えずに、この中でジャンプ台を配置する
+  airApproachM:          6,     // 区間の入口から踏切まで（APPROACH）
+  airTakeoffM:           2,     // 踏切の手前。沈み込み→伸び上がりに使う距離
+  airFlightM:            9,     // 踏切から着地までの飛距離
+  airMaxHeight:         96,     // 飛行の最高到達点(px。描画のみ)
+  airCamShift:          20,     // APPROACH でカメラを前方へ寄せる量(px)
+  airCamLerp:            7,     // カメラ寄せの追従の速さ
+  airRampHeight:        34,     // エア台の見た目の高さ(px)
+  airLandLeanTime:     0.55,    // 着地姿勢（後傾／前傾）を見せる時間(秒)
+  airOpenLerp:          14,     // タップ後に回転を止めて開くまでの速さ
+
+  logicalWidth:          450,   // 論理幅(px)。高さは端末比率に追従（§4）
+  courseHalfWidth:       224,   // コース境界＝ゲートを立てる位置の半幅(px)
+  perspectiveMin:        0.74,  // 疑似奥行き。画面最上部での縮小率（1.0 で奥行きなし）
+  leadInGaps:            4,     // 開始時、最初のコブまでの基準間隔の本数。v2.4 で 5→4
+  maxInputExtrapolation: 0.05,  // 入力タイムスタンプ外挿の上限(秒)（§22.5 の暴走防止）
+  maxFrameDt:            0.10,  // 1フレームで進める上限(秒)（タブ復帰時の飛び防止）
+  maxDpr:                2,     // 描画解像度の上限
+  gateEveryGaps:         7,     // ゲート間隔（基準間隔の本数）。7×3.5m=24.5m ≒ CL の 1/10。v3.0 で 3→7
+  gateHeight:            48,    // ゲートポールの高さ(px)
+  gatePanelW:            21,    // ゲート旗の幅(px)
+  gatePanelH:            14,    // ゲート旗の高さ(px)
+  gateColorRed:   '#d8382c',    // 赤ゲート
+  gateColorBlue:  '#1f6fd0',    // 青ゲート
+  mogulRadiusX:          40,    // コブの見た目の半径X(px)
+  mogulRadiusY:          21,    // コブの接地面の半径Y(px)
+  mogulLift:             0.45,  // 稜線を接地点より持ち上げる量（半径Yに対する比率）
+  mogulTrough:           1.45,  // 周囲のくぼみの広さ（半径Xに対する比率）
+  mogulPeak:             1.09,  // 稜線の尖り（半径Yに対する比率）。1.0で楕円、大きいほど尖る
+  fieldPitch:            224,   // 同じ行にコブが立つ列の間隔(px)＝横間隔の2倍
+  fieldColumns:          2,     // 判定ラインの外側に並べる列数（左右それぞれ）
+  fieldHalfWidth:        170,   // コブを置く範囲の半幅。ゲートに重ならないよう境界より内側にする
+  decoScale:             0.88,  // 判定しないコブの大きさ（判定コブに対する比率）
+  decoFade:              0.50,  // 判定しないコブの陰影の弱さ（0〜1）
+  speckleGap:            26,    // 雪面の粒の間隔(px)。速度感の手がかり
+  playerPopTime:         0.22,  // PERFECT 時の選手の拡大演出(秒)
+  swayMiss:              20,    // MISS 時に選手が振られる量(px)
+  swayDecay:             7,     // 振られの収まりの速さ
+  shakeMiss:             6,     // MISS 時の画面揺れ(px)
+  shakeDecay:            9,     // 画面揺れの収まりの速さ
+  sprayPerfect:          14,    // PERFECT の雪しぶき粒数
+  sprayGood:             7,     // GOOD の雪しぶき粒数
+  fallAnimLerp:          10,    // 転倒姿勢へ倒れる／起き上がる速さ
+  fallLeanAngle:         1.25,  // 転倒時に倒れる角度(rad)
+  fallRampTime:          0.35,  // 転倒後、スクロールを元の速度へ戻すまでの時間(秒)
+  narrowWidth:           380,   // これ未満の実寸幅では HUD を詰める（§19.1）
+  shortResultHeight:     780,   // これ未満の実寸高ではリザルトを詰める（RETRY をスクロールなしで押せるように）
+  judgeTextOffset:       26,    // 判定表示を判定ラインからどれだけ下に出すか(px)
+  judgeTextHeight:       34,    // 判定表示の高さが測れないときの既定値(px)
+  judgeTextGap:           5,    // 判定表示と画面下部 HUD のあいだの最小すき間(px)
+  countdownTime:         3,     // スタートのカウントダウン(秒)
+  finishDelay:           1.4,   // FINISH 表示からリザルトを出すまで(秒)
+  airTint:               'rgba(150,190,225,.20)',  // エア区間の雪面の色
+  finishLineColor:       '#d8382c',                // フィニッシュラインの色
+  hudInterval:           0.06   // HUD(DOM) の更新間隔(秒)
+};
+
+/* =========================================================================
+   §22.1 不変条件チェック（起動時）
+   ========================================================================= */
+var invariantIssues = [];
+(function checkInvariants(){
+  if (!(CONFIG.okWindow < CONFIG.targetSegment)) {
+    invariantIssues.push('okWindow(' + CONFIG.okWindow + ') < targetSegment(' + CONFIG.targetSegment +
+      ') が不成立 → 通常MISSの帯が消えます');
+  }
+  // §22.1 は難易度ごとに揺らぎ幅が変わるので、3 つすべてで確認する（§7.4 守ること 3）
+  var okLines = [];
+  for (var key in CONFIG.jitterSections) {
+    var eff = effectiveJitter(key);            // 揺らぎの幅は難易度ごと（§7.4 / §22.1）
+    var rhs = (1 - eff) / 2;
+    if (!(CONFIG.targetSegment <= rhs + 1e-9)) {
+      invariantIssues.push(key + ': targetSegment(' + CONFIG.targetSegment + ') <= (1-' + eff +
+        ')/2(' + rhs.toFixed(3) + ') が不成立 → 隣のコブと担当区間が重なります');
+    } else {
+      okLines.push(key + ' ' + CONFIG.targetSegment + '<=' + rhs.toFixed(3));
+    }
+  }
+  if (!(CONFIG.perfectWindow <= CONFIG.goodWindow && CONFIG.goodWindow <= CONFIG.okWindow)) {
+    invariantIssues.push('perfectWindow <= goodWindow <= okWindow の順序が崩れています');
+  }
+  // セット入力の窓（§17.3.2 不変条件 (1)(2)）
+  if (!(CONFIG.airSetGoodM <= CONFIG.airTakeoffM)) {
+    invariantIssues.push('airSetGoodM(' + CONFIG.airSetGoodM + ') <= airTakeoffM(' +
+      CONFIG.airTakeoffM + ') が不成立 → セット窓の遅い側がリップを越えます');
+  }
+  if (!(CONFIG.airSetGoodM < CONFIG.airApproachM - CONFIG.airTakeoffM)) {
+    invariantIssues.push('airSetGoodM(' + CONFIG.airSetGoodM + ') < airApproachM-airTakeoffM(' +
+      (CONFIG.airApproachM - CONFIG.airTakeoffM) + ') が不成立 → セット窓の早い側がエア区間の外へ出ます');
+  }
+  // ゲート間隔が ICR の CF（CL の 1/10）から大きく外れていないか（§20.1）
+  var gateM = CONFIG.gateEveryGaps * CONFIG.mogulSpacingM;
+  var cfM   = CONFIG.courseLengthM * CONFIG.gateSpacingPctOfCL;
+  if (Math.abs(gateM - cfM) / cfM > 0.15) {
+    invariantIssues.push('ゲート間隔 ' + gateM.toFixed(1) + 'm が CF（CL の 1/10 = ' +
+      cfM.toFixed(1) + 'm）から 15% 以上ずれています');
+  }
+  for (var i = 0; i < invariantIssues.length; i++) {
+    console.warn('[CONFIG WARNING] ' + invariantIssues[i]);
+  }
+  if (!invariantIssues.length) {
+    console.log('[CONFIG] 不変条件 OK : okWindow ' + CONFIG.okWindow + ' < targetSegment / ' +
+      okLines.join(' / ') + ' / ゲート ' + gateM.toFixed(1) + 'm vs CF ' + cfM.toFixed(1) + 'm');
+  }
+})();
+
+/* =========================================================================
+   ユーティリティ
+   ========================================================================= */
+function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+
+// 2色の中間色。t=1 で b、t=0 で a
+function mixHex(a, b, t){
+  var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  var r = Math.round((pa >> 16) + (((pb >> 16) - (pa >> 16)) * t));
+  var g = Math.round(((pa >> 8) & 255) + ((((pb >> 8) & 255) - ((pa >> 8) & 255)) * t));
+  var bl = Math.round((pa & 255) + (((pb & 255) - (pa & 255)) * t));
+  return 'rgb(' + r + ',' + g + ',' + bl + ')';
+}
+
+// mulberry32: courseSeed 固定の疑似乱数（§7.2.1）。Math.random() は使わない
+function makeRng(seed){
+  var a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// 雪面の粒用（コース生成の乱数列を汚さないための独立ハッシュ）
+function hash01(n){
+  n = (n ^ 61) ^ (n >>> 16);
+  n = (n + (n << 3)) | 0;
+  n = n ^ (n >>> 4);
+  n = Math.imul(n, 0x27d4eb2d);
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+
+/* =========================================================================
+   定数（CONFIG から導出）
+   ========================================================================= */
+var gapPx = CONFIG.baseScroll * CONFIG.baseTurnInterval;   // 基準ターン間隔の距離換算（§8.2）
+var SIDE_LEFT = -1, SIDE_RIGHT = 1;
+
+// balance = BALANCE の増減（§14）／ combo = COMBO の扱い（§16。'inc' 加算 / 'keep' 維持 / 'reset' 0 / null 影響なし）
+var RESULT = {
+  perfect:   { label:'PERFECT', cls:'r-perfect', counter:'perfect',   delta:  CONFIG.perfectSpeedGain,    gain:true,
+               balance:  CONFIG.perfectBalanceRecovery, combo:'inc'   },
+  good:      { label:'GOOD',    cls:'r-good',    counter:'good',      delta:  CONFIG.goodSpeedGain,       gain:true,
+               balance:  CONFIG.goodBalanceRecovery,    combo:'inc'   },
+  ok:        { label:'OK',      cls:'r-ok',      counter:'ok',        delta:  CONFIG.okSpeedGain,         gain:true,
+               balance:  0,                             combo:'keep'  },
+  miss:      { label:'MISS',    cls:'r-miss',    counter:'miss',      delta: -CONFIG.missSpeedLoss,       gain:false,
+               balance: -CONFIG.missBalanceLoss,        combo:'reset' },
+  majorMiss: { label:'MISS',    cls:'r-miss',    counter:'majorMiss', delta: -CONFIG.majorMissSpeedLoss,  gain:false,
+               balance: -CONFIG.majorMissBalanceLoss,   combo:'reset' },
+  // 空振りは BALANCE も COMBO も動かさない（§14 の表に無い／§16「空振りは COMBO に影響しない」）
+  whiff:     { label:'WHIFF',   cls:'r-whiff',   counter:'whiff',     delta: -CONFIG.whiffSpeedLoss,      gain:false,
+               balance:  0,                             combo:null    }
+};
+// 転倒・フィニッシュは判定ではないので RESULT には入れない（表示だけ共用する）
+var FALL_RESULT   = { label:'FALL',   cls:'r-fall' };
+var FINISH_RESULT = { label:'FINISH', cls:'r-finish' };
+
+/* =========================================================================
+   DOM
+   ========================================================================= */
+var stage     = document.getElementById('stage');
+var canvas    = document.getElementById('game');
+var ctx       = canvas.getContext('2d');
+var elElapsed = document.getElementById('elapsed');
+var elSpeedV  = document.getElementById('speedVal');
+var elSpeedB  = document.getElementById('speedBar');
+var elJudge   = document.getElementById('judgeText');
+var elDebug   = document.getElementById('debug');
+var elBalV    = document.getElementById('balanceVal');
+var elBalB    = document.getElementById('balanceBar');
+var elCombo   = document.getElementById('comboVal');
+var elFallTag = document.getElementById('fallTag');
+// STEP 3
+var elStartOv = document.getElementById('startOverlay');
+var elResultOv= document.getElementById('resultOverlay');
+var elCountdn = document.getElementById('countdown');
+var elProgL   = document.getElementById('progLeft');
+var elProgR   = document.getElementById('progRight');
+var elProgBar = document.getElementById('progBar');
+var elProgOut = document.getElementById('progBarOuter');
+var elBottom  = document.getElementById('bottom');
+var elAirInfoMain = document.getElementById('airInfoMain');
+var elSetInfo     = document.getElementById('setInfo');
+var showDebug = true;
+var elCount = {
+  perfect:   document.getElementById('cPerfect'),
+  good:      document.getElementById('cGood'),
+  ok:        document.getElementById('cOk'),
+  miss:      document.getElementById('cMiss'),
+  majorMiss: document.getElementById('cMajor'),
+  whiff:     document.getElementById('cWhiff')
+};
+
+/* =========================================================================
+   状態
+   ========================================================================= */
+var view = { cssW:0, cssH:0, dpr:1, scale:1, W:CONFIG.logicalWidth, H:800, judgeY:576 };
+
+var G = null;          // ゲーム状態
+var showWindows = false;
+
+function resetGame(){
+  var course = buildCourse();
+  // エアは区間ぶんの配列で持つ（§29）。状態はエアごとに独立
+  var airs = [
+    buildAir(course.airZones[0], CONFIG.selectedAir1, 1),
+    buildAir(course.airZones[1], CONFIG.selectedAir2, 2)
+  ].filter(Boolean);
+  G = {
+    time: 0,                       // 描画用の時計（カウントダウン中も進む）
+    runTime: 0,                    // 計測タイム。running の間だけ進む（§19.2）
+    phase: 'ready',                // ready → countdown → running → finished
+    countdown: 0,
+    resultTimer: 0,
+    playerD: 0,                    // コース進行距離（px）
+    speed: CONFIG.startSpeed,
+    lastMs: performance.now(),     // 直近の update 時刻（入力外挿の基準）
+    inputLockUntilMs: 0,
+    moguls:   course.moguls,       // 有限コース（§7.3）。seed × 難易度が同じなら毎回同一
+    airZones: course.airZones,
+    finishD:  course.finishD,
+    sectionCounts: course.sectionCounts,
+    difficulty: CONFIG.difficulty, // このランの難易度（§7.4）。リザルトに出す
+    counts: { perfect:0, good:0, ok:0, miss:0, majorMiss:0, whiff:0 },
+    // --- STEP 2（§14〜§16）---
+    balance: CONFIG.startBalance,  // 0〜100。乱れの唯一の蓄積量（§14.1）
+    combo:   0,
+    falls:   0,
+    stops:   0,                    // 完全停止。STEP 3 では発生しない（§18.2(4)）
+    fallTimer: 0,                  // >0 の間は転倒中（コースを止める）
+    fallRamp:  0,                  // 復帰後、スクロールを戻すまでの残り時間
+    fallAnim:  0,                  // 転倒姿勢の度合い 0〜1（描画のみ）
+    scrollFactor: 1,               // 転倒による停止／復帰でスクロールに掛かる係数
+    // --- STEP 3 採点用の積算（§18.2）---
+    balanceSum:  0,                // 平均BALANCE は時間平均（最終値ではない）
+    balanceTime: 0,
+    score: null,                   // フィニッシュ時に確定する
+    // --- STEP 4〜5（AIR 1 / AIR 2。§17 / §29）---
+    airs:     airs,
+    // §17.3.2 不変条件 (3)。第1・第2エアの両方を確認する（v3.8）
+    airCourseIssue: [
+      checkAirCourseInvariant(course.moguls, course.airZones[0], 'AIR 1'),
+      checkAirCourseInvariant(course.moguls, course.airZones[1], 'AIR 2')
+    ].filter(Boolean).join(' / ') || null,
+    airFalls: 0,                   // エアの転倒。TURN SCORE の転倒回数とは別に持つ
+    camShift: 0,                   // エア進入時のカメラ寄せ（描画のみ）
+    lastTurnMs: null,              // 直近のターン入力時刻（§13.1(4)。描画のみ）
+    fallDir: 1,                    // 転倒で倒れる向き。転倒開始時に固定する
+    neutralReturns: 0,             // ニュートラル復帰の作動回数（デバッグ用）
+    player: { x:0, targetX:0, sway:0, pop:0, lean:0,
+              comp:0, compQ:0.7, compT:999, buck:0, line:0, disturb:0 },
+    shakeX: 0, shakeY: 0,
+    particles: [],
+    hudAcc: 999
+  };
+  showJudge(null);
+  hideOverlays();
+  buildProgressMarks();
+}
+
+/* ---- コース生成（§7.3 確定構成）--------------------------------------
+   上部 8 → 第1エア 12m → 中間 40 → 第2エア 12m → 下部 12 ＝ ターンコブ 60 個。
+   左右完全交互（§7.1）、間隔の揺らぎは難易度ごとの幅（§7.4）。乱数は courseSeed 固定（§7.2.1）。
+   コースは有限なので、遅延生成せず起動時に全体を作る（＝リトライで必ず同じ配置）。 */
+var SECTION_KEY = ['upper', 'middle', 'lower'];
+
+// 難易度ごとの揺らぎの幅（§7.4）。jitterAmp に無ければ gapJitter を既定値として使う
+function jitterAmpOf(diff){
+  var a = CONFIG.jitterAmp && CONFIG.jitterAmp[diff];
+  return (typeof a === 'number') ? a : CONFIG.gapJitter;
+}
+
+// 実効的な揺らぎ幅。1 区間でも揺らぐならその難易度の幅、どこも揺らがないなら 0
+function effectiveJitter(diff){
+  var j = CONFIG.jitterSections[diff];
+  return (j && (j.upper || j.middle || j.lower)) ? jitterAmpOf(diff) : 0;
+}
+
+function buildCourse(){
+  var spacing = CONFIG.mogulSpacingM * CONFIG.pxPerMeter;    // コブ間隔(px)
+  var clPx    = CONFIG.courseLengthM * CONFIG.pxPerMeter;    // CL(px)
+  var airPx   = CONFIG.airZoneM * CONFIG.pxPerMeter;
+  var EPS     = 1e-6;
+
+  // 2. 3. エア区間（踏切位置は CL に対する割合で決まる）
+  var airZones = [
+    { index: 1, start: CONFIG.air1PctOfCL * clPx },
+    { index: 2, start: (1 - CONFIG.air2PctOfCL) * clPx }
+  ];
+  for (var a = 0; a < airZones.length; a++) airZones[a].end = airZones[a].start + airPx;
+
+  // 4〜6. 助走の位置から mogulSpacing 間隔で置く。エア区間に入る位置は終端まで飛ばす。
+  //       総コブ数は入力ではなく「入るだけ入れた結果」（§7.3）
+  var lastAllowed = clPx - CONFIG.runOutGaps * spacing;
+  var grid = [];
+  var d = CONFIG.leadInGaps * spacing;
+  var side = SIDE_LEFT, section = 0;
+  var guard = 0;
+  while (d <= lastAllowed + EPS && guard++ < 10000) {
+    var inZone = null;
+    for (var z = 0; z < airZones.length; z++) {
+      if (d >= airZones[z].start - EPS && d < airZones[z].end - EPS) { inZone = airZones[z]; break; }
+    }
+    if (inZone) { d = inZone.end; section = inZone.index; continue; }   // 区間の終端まで飛ばす
+    grid.push({ d: d, side: side, section: section });
+    side = -side;                                             // 完全交互（§7.1）はエアをまたいでも継続
+    d += spacing;
+  }
+
+  // 難易度による揺らぎ（§7.4）。本数・区間境界・CL は難易度によらず同一。
+  // 揺らぎのない配置を先に作り、区間の先頭と末尾を固定したうえで各コブの位置だけを動かす。
+  // 位置を直接ずらすので誤差が累積せず、隣との間隔は spacing×(1±jitterAmp[難易度]) に収まる
+  var jit = CONFIG.jitterSections[CONFIG.difficulty] || CONFIG.jitterSections.advanced;
+  var amp = jitterAmpOf(CONFIG.difficulty) * spacing / 2;
+  var firstOf = {}, lastOf = {};
+  for (var i = 0; i < grid.length; i++) {
+    if (firstOf[grid[i].section] === undefined) firstOf[grid[i].section] = i;
+    lastOf[grid[i].section] = i;
+  }
+
+  var rng = makeRng(CONFIG.courseSeed);
+  var moguls = [], prevD = null;
+  for (i = 0; i < grid.length; i++) {
+    var g = grid[i];
+    var r = rng() * 2 - 1;              // 難易度によらず同じだけ乱数を消費する（配置を揃えるため）
+    var edge = (i === firstOf[g.section] || i === lastOf[g.section]);
+    var off  = (jit[SECTION_KEY[g.section]] && !edge) ? r * amp : 0;
+    var dd   = g.d + off;
+    moguls.push({
+      index: i, d: dd, side: g.side, section: g.section,
+      gapFromPrev: prevD === null ? spacing : dd - prevD,
+      judged: false, result: null, judgedAt: -1
+    });
+    prevD = dd;
+  }
+
+  return {
+    moguls: moguls,
+    airZones: airZones,
+    finishD: clPx,                                    // 7. フィニッシュラインは CL
+    sectionCounts: [
+      grid.filter(function(g){ return g.section === 0; }).length,
+      grid.filter(function(g){ return g.section === 1; }).length,
+      grid.filter(function(g){ return g.section === 2; }).length
+    ]
+  };
+}
+
+/* =========================================================================
+   AIR（STEP 4。§17）
+   エア区間 20m の中に、APPROACH → TAKEOFF → FLIGHT の 3 フェーズを配置する。
+   操作は着地タイミングの 1 タップのみ。踏切は自動（§17.3 / §17.4）。
+   ========================================================================= */
+function buildAir(zone, trickKey, index){
+  if (!zone) return null;
+  var ppm  = CONFIG.pxPerMeter;
+  var dLip = zone.start + CONFIG.airApproachM * ppm;      // 踏切（リップ）
+  var t    = CONFIG.airTricks[trickKey] || CONFIG.airTricks['360'];
+  return {
+    index: index, trick: trickKey, label: t.label, dd: t.dd, code: t.code,
+    dApproach: zone.start,
+    dTakeoff:  dLip - CONFIG.airTakeoffM * ppm,
+    // セットの理想位置。dTakeoff とは独立に持つ（TAKEOFF を動かさずに調整できるように。§17.3.2）
+    dSet:      dLip - CONFIG.airSetIdealM * ppm,
+    dLip:      dLip,
+    dLand:     dLip + CONFIG.airFlightM * ppm,            // 理想の着地点
+    dEnd:      zone.end,
+    stage: 'none',        // none → approach → takeoff → flight → landed → done
+    u: 0,                 // 飛行の進行 0〜1
+    rot: 0,               // 回転量（回転数）
+    openT: 0,             // タップ後、開き切るまでの進行 0〜1
+    inputDone: false,
+    deltaMs: null,        // 着地入力のずれ（+ が遅い）
+    result: null,         // 'perfect' | 'good' | 'deep' | 'miss' | 'fall'
+    quality: null, qualityLanding: null, setFactor: 1, value: null,
+    landLean: 0, landLeanT: 0,
+    // --- セットポジション（§17.3.2）---
+    setDone: false,
+    setResult: null,      // 'perfect' | 'good' | 'none'
+    setDeltaM: null,      // 理想位置からのずれ(m)。+ が遅い
+    setCenterT: 0,        // ニュートラルへ戻す残り時間(秒)
+    setCenterFrom: 0
+  };
+}
+
+/* §17.3.2 不変条件 (3)：直前のコブの担当区間の終端 < エア区間の入口。
+   v3.8 で「成立していれば嬉しい性質」に格下げ。食い込んでいても、セット入力に
+   Active Target 優先を入れたことで二重の罰にはならない。情報として出すだけにする。
+   コース生成のパラメータで変わるので、コースを作るたびに全エア区間を確認する */
+var airCourseWarned = {};
+function checkAirCourseInvariant(moguls, zone, label){
+  if (!zone) return null;
+  var last = null;
+  for (var i = 0; i < moguls.length; i++) {
+    if (moguls[i].d < zone.start) last = moguls[i]; else break;
+  }
+  if (!last) return null;
+  var segEnd = last.d + CONFIG.targetSegment * gapPx;
+  if (segEnd >= zone.start) {
+    var over = (segEnd - zone.start) / CONFIG.pxPerMeter;
+    var msg = label + ': 直前のコブの担当区間が区間入口に ' + over.toFixed(2) +
+      'm 食い込んでいます（※ Active Target 優先で吸収済み）';
+    if (!airCourseWarned[msg]) { airCourseWarned[msg] = 1; console.info('[CONFIG INFO] ' + msg); }
+    return msg;
+  }
+  return null;
+}
+
+// 技ごとの回転の作り（描画のみ）。flip = 縦回転の回数 / yaw = 横回転の回数
+var AIR_SPIN = {
+  '360':      { flip: 0, yaw: 1, tilt: 0.00 },
+  'backFull': { flip: 1, yaw: 1, tilt: 0.10 },
+  'cork720':  { flip: 1, yaw: 2, tilt: 0.42 }   // オフアクシス＝斜めの軸
+};
+
+var SET_LABEL = { perfect:'PERFECT SET', good:'GOOD SET', none:'NO SET' };
+
+var AIR_STAGE_LABEL = {
+  none:'（コブなし）', approach:'APPROACH', takeoff:'TAKEOFF',
+  flight:'FLIGHT', landed:'LANDING', done:'（コブなし）'
+};
+
+var AIR_RESULT = {
+  perfect: { label:'PERFECT LANDING', cls:'r-perfect' },
+  good:    { label:'GOOD LANDING',    cls:'r-good'    },
+  deep:    { label:'DEEP',            cls:'r-ok'      },
+  miss:    { label:'AIR MISS',        cls:'r-miss'    },
+  fall:    { label:'AIR FALL',        cls:'r-fall'    }
+};
+
+// 現在のスクロール速度(px/秒)。着地判定の ms ↔ px 換算に使う
+function scrollPxPerSec(){
+  return CONFIG.baseScroll * G.speed * (G.scrollFactor > 0 ? G.scrollFactor : 1);
+}
+
+// いま関わっているエア（区間の中にいるもの）。区間の外なら null
+function activeAir(d){
+  for (var i = 0; i < G.airs.length; i++) {
+    var a = G.airs[i];
+    if (d >= a.dApproach && d < a.dEnd) return a;
+  }
+  return null;
+}
+
+// 区間番号からエアを引く（描画用）
+function airOfZone(zoneIndex){
+  for (var i = 0; i < G.airs.length; i++) if (G.airs[i].index === zoneIndex) return G.airs[i];
+  return null;
+}
+
+// エア区間の中にいるか（§13.1(4) のニュートラル復帰の除外に使う）
+function inAnyAirZone(d){ return !!activeAir(d); }
+
+function updateAir(dt){
+  for (var i = 0; i < G.airs.length; i++) updateOneAir(G.airs[i], dt);
+}
+
+function updateOneAir(a, dt){
+  if (!a || a.stage === 'done') return;
+  var d = G.playerD;
+
+  var prev = a.stage;
+  if (d < a.dApproach)      a.stage = 'none';
+  else if (d < a.dTakeoff)  a.stage = 'approach';
+  else if (d < a.dLip)      a.stage = 'takeoff';
+  else if (a.result === null) a.stage = 'flight';
+
+  // §17.3.1 エア区間に入ったら直前のターンの判定表示を消す。
+  // 着地点と選手の姿勢を読む場面で、画面で一番大きい文字が別の情報を主張しないようにする。
+  // FLIGHT に入るときにも消すのは、TAKEOFF 中の空振り表示が飛行に食い込まないようにするため
+  if (a.stage !== prev && (a.stage === 'approach' || a.stage === 'flight')) showJudge(null);
+
+  // リップまでに入力が無ければ NO SET を確定させる（§17.3.2）
+  if (!a.setDone && d >= a.dLip) finalizeAirSet(a);
+  if (a.setCenterT > 0) a.setCenterT = Math.max(0, a.setCenterT - dt);
+
+  if (a.stage === 'flight') {
+    a.u = clamp((d - a.dLip) / (a.dLand - a.dLip), 0, 1.6);
+    // タップするまで回り続ける。タップした瞬間から「開いて」上体を起こす（§17.4）
+    if (a.inputDone) a.openT = Math.min(1, a.openT + CONFIG.airOpenLerp * dt);
+    var spin = AIR_SPIN[a.trick] || AIR_SPIN['360'];
+    if (!a.inputDone) a.rot = a.u * Math.max(spin.flip, spin.yaw);
+
+    // 着地の解決（§17.4）。入力があればそのずれで、無ければ猶予を過ぎた時点で FALL
+    var win = CONFIG.airLandWindows[a.trick] || CONFIG.airLandWindows['360'];
+    var horizonPx = (win.recover * CONFIG.airMissHorizon / 1000) * scrollPxPerSec();
+    if (!a.inputDone && d > a.dLand + horizonPx) resolveAirLanding(a, null, 'fall');
+  }
+
+  if (a.landLeanT > 0) a.landLeanT = Math.max(0, a.landLeanT - dt);
+  if (a.result !== null && d > a.dEnd) a.stage = 'done';
+}
+
+/* セットポジション入力（§17.3.2）。
+   ★判定は ms ではなく距離(m)。地面の上の出来事なので §8.1 に合わせる。
+   速度 0.65〜1.50 のどこでも窓の物理的な広さが変わらない */
+function resolveAirSet(a, tMs){
+  if (!a || a.setDone) return;                 // 成立は 1 回だけ。2 回目以降は無視
+  var deltaM = (distanceAt(tMs) - a.dSet) / CONFIG.pxPerMeter;   // + が遅い
+  var ad = Math.abs(deltaM);
+  a.setResult = ad <= CONFIG.airSetPerfectM ? 'perfect'
+              : ad <= CONFIG.airSetGoodM    ? 'good'
+              : 'none';
+  a.setDeltaM = deltaM;
+  a.setDone   = true;
+
+  // タップの瞬間を吸収サイクルのピークにする（§13.1）。そこから伸び上がるのがセットの動作
+  G.player.compT = 0;
+  if (a.setResult !== 'none') {
+    G.player.compQ = 1.0;
+    // ニュートラルポジションへ戻す（§17.3.2 の実体）
+    a.setCenterFrom = G.player.x + G.player.sway;
+    a.setCenterT    = CONFIG.airSetCenterTime;
+    G.player.targetX = 0;
+  }
+}
+
+// セット失敗も含めた最終確定（リップ通過までに入力が無ければ NO SET）
+function finalizeAirSet(a){
+  if (!a || a.setDone) return;
+  a.setResult = 'none';
+  a.setDeltaM = null;
+  a.setDone   = true;
+}
+
+// 着地入力。tMs があればその時刻のずれで判定、forced='fall' なら無入力の確定
+function resolveAirLanding(a, tMs, forced){
+  if (!a || a.result !== null) return;
+  var win = CONFIG.airLandWindows[a.trick] || CONFIG.airLandWindows['360'];
+  var kind, delta = null;
+
+  if (forced === 'fall') {
+    kind = 'fall';
+  } else {
+    // ずれは「理想の着地点までの距離 ÷ スクロール速度」で ms に直す（§22.5 と同じ考え方）
+    delta = (distanceAt(tMs) - a.dLand) / scrollPxPerSec() * 1000;
+    var ad = Math.abs(delta);
+    kind = ad <= win.perfect ? 'perfect'
+         : ad <= win.good    ? 'good'
+         : ad <= win.recover ? 'deep'
+         : 'miss';
+    a.inputDone = true;
+    a.deltaMs = delta;
+  }
+
+  a.result = kind;
+  // セットは加重平均ではなく係数として掛ける（§17.3.2）。FIS の Quality 帯の意味を壊さないため
+  a.qualityLanding = airQualityOf(kind, delta, win);
+  a.setFactor = CONFIG.airSetFactor[a.setResult || 'none'];
+  a.quality   = clamp(a.qualityLanding * a.setFactor, 0.1, 10.0);
+  a.value     = a.quality * a.dd;    // AIR VALUE = Quality × DD（§17.5）
+  a.stage     = 'landed';
+
+  // 着地姿勢（早い＝後傾 / 遅い＝前傾）。描画のみ
+  a.landLean  = delta === null ? 1 : clamp(delta / win.recover, -1, 1);
+  a.landLeanT = CONFIG.airLandLeanTime;
+
+  showJudge(AIR_RESULT[kind]);
+
+  // 失敗の波及（§17.6）。人工的な減点は足さない
+  if (kind === 'miss') {
+    var sl = CONFIG.airMissSpeedLoss[a.trick];
+    var bl = CONFIG.airMissBalanceLoss[a.trick];
+    G.speed   = clamp(G.speed - (sl || 0), CONFIG.minSpeed, CONFIG.maxSpeed);
+    G.balance = clamp(G.balance - (bl || 0), 0, CONFIG.startBalance);
+    G.combo   = 0;
+    if (G.balance <= 0 && G.fallTimer <= 0) triggerFall('air');
+  } else if (kind === 'fall') {
+    triggerFall('air');              // 大幅減速＋BALANCE 復帰＋数ターンかけて立て直す
+  }
+}
+
+// Quality 0〜10（§17.5）。各帯の上端（ずれ 0 側）から下端（帯の外側）へ線形に落とす
+function airQualityOf(kind, delta, win){
+  var band = CONFIG.airQualityBands[kind];
+  if (!band) return 0;
+  if (kind === 'fall') return band[0];
+  var ad = Math.abs(delta), lo, hi;
+  if      (kind === 'perfect') { lo = 0;           hi = win.perfect; }
+  else if (kind === 'good')    { lo = win.perfect; hi = win.good;    }
+  else if (kind === 'deep')    { lo = win.good;    hi = win.recover; }
+  else                         { lo = win.recover; hi = win.recover * CONFIG.airMissHorizon; }
+  var t = hi > lo ? clamp((ad - lo) / (hi - lo), 0, 1) : 0;
+  return band[1] + (band[0] - band[1]) * t;        // 帯の上端 → 下端
+}
+
+// エア区間に入っているか（描画・HUD 用。判定には使わない）
+function currentAirZone(d){
+  for (var i = 0; i < G.airZones.length; i++) {
+    if (d >= G.airZones[i].start && d <= G.airZones[i].end) return G.airZones[i];
+  }
+  return null;
+}
+
+/* =========================================================================
+   判定（§8）
+   ========================================================================= */
+
+// 入力時刻 tMs におけるコース進行距離（§22.5：描画フレームに丸めない）
+function distanceAt(tMs){
+  var dt = (tMs - G.lastMs) / 1000;
+  dt = clamp(dt, 0, CONFIG.maxInputExtrapolation);
+  return G.playerD + CONFIG.baseScroll * G.speed * G.scrollFactor * dt;
+}
+
+// §8.5 担当区間を過ぎた未判定のコブ → Major MISS
+function resolvePassed(dAt){
+  var seg = CONFIG.targetSegment * gapPx;
+  for (var i = 0; i < G.moguls.length; i++) {
+    var m = G.moguls[i];
+    if (m.d - dAt >= -seg) break;      // 配列は d 昇順。以降はまだ担当区間内
+    if (!m.judged) applyResult('majorMiss', m);
+  }
+}
+
+// §8.3 Active Target = 未判定のうち最も手前のコブで、担当区間内のもの
+function activeTarget(dAt){
+  var seg = CONFIG.targetSegment * gapPx;
+  for (var i = 0; i < G.moguls.length; i++) {
+    var m = G.moguls[i];
+    if (m.judged) continue;
+    return (Math.abs(m.d - dAt) <= seg) ? m : null;   // 前倒し判定はしない
+  }
+  return null;
+}
+
+// §8.4 入力処理
+function handleTurnInput(dir, tMs){
+  if (G.phase !== 'running') return;                  // スタート前・フィニッシュ後は受け付けない（§27）
+  if (G.fallTimer > 0) return;                        // 転倒中は操作を受け付けない（§15）
+
+  // エア区間の入力（§17.3.2 / §17.4）。左右どちらでもよく、ターンの入力ロックには縛られない。
+  // どちらのエア区間にいるかは位置から引く（§29）
+  var airAt = activeAir(distanceAt(tMs));
+  if (airAt) {
+    var a = airAt, dAt = distanceAt(tMs);
+    // エア区間の入口〜リップ → セット入力。成立は 1 回だけ、2 回目以降は無視（空振りにもしない）。
+    // ★優先順位はターン → セット → 着地（§17.3.2 v3.8）。
+    // 直前のコブの担当区間が区間入口に食い込むコース（第2エア）でも、
+    // ターン判定を先に通すことで「1 回のタップで Major MISS ＋ NO SET」の二重の罰を防ぐ
+    if (a.result === null && dAt >= a.dApproach && dAt < a.dLip && !activeTarget(dAt)) {
+      if (!a.setDone) resolveAirSet(a, tMs);
+      return;
+    }
+    // 飛行中 → 着地入力。成立するのは 1 回だけ
+    if (a.stage === 'flight' && a.result === null) { resolveAirLanding(a, tMs); return; }
+  }
+
+  if (tMs < G.inputLockUntilMs) return;               // 1. 入力ロック中 → 破棄
+
+  var dAt = distanceAt(tMs);
+  resolvePassed(dAt);
+
+  G.player.compT = 0;      // タップした瞬間から吸収サイクルを始める（§13.1）
+
+  // 選手の横移動は視覚表現のみ（§13.1）。判定には一切使わない
+  G.player.targetX = dir * CONFIG.playerOffsetX;
+  G.lastTurnMs = tMs;      // 直近のターン入力時刻（§13.1(4)）。セット・着地では更新しない
+
+  var m = activeTarget(dAt);
+  if (!m) {                                           // 2. Active Target なし → 空振り（§9）
+    applyResult('whiff', null);
+    G.inputLockUntilMs = tMs + CONFIG.inputLock * 1000;
+    return;
+  }
+  var sr = (m.d - dAt) / gapPx;                       // 符号付き（+=早い / -=遅い）。演出用
+  if (dir !== m.side) { applyResult('majorMiss', m); return; }   // 3. 逆方向
+
+  var r = Math.abs(sr);                               // 判定は gapPx に対する比率のみ（§8.2）
+  if      (r <= CONFIG.perfectWindow) applyResult('perfect', m);
+  else if (r <= CONFIG.goodWindow)    applyResult('good', m);
+  else if (r <= CONFIG.okWindow)      applyResult('ok', m);
+  else                                applyResult('miss', m);
+}
+
+// §12 速度変化。加速のみ逓減、減速は固定量
+function applySpeed(delta, isGain){
+  if (isGain && CONFIG.gainFalloff && delta !== 0) {
+    var f = (CONFIG.maxSpeed - G.speed) / (CONFIG.maxSpeed - CONFIG.startSpeed);
+    if (CONFIG.clampGainFactor) f = Math.min(f, 1);
+    f = Math.max(f, 0);
+    delta *= f;
+  }
+  // §15「BALANCE が低い状態では速度が上がりにくくなる」。加速側にのみ掛ける
+  if (isGain && CONFIG.balanceAffectsGain && delta !== 0) {
+    delta *= CONFIG.balanceGainFloor +
+             (1 - CONFIG.balanceGainFloor) * clamp(G.balance / CONFIG.startBalance, 0, 1);
+  }
+  G.speed = clamp(G.speed + delta, CONFIG.minSpeed, CONFIG.maxSpeed);
+}
+
+// §15 転倒。BALANCE が 0 になったときだけ起きる。ゲームオーバーにはしない
+// source 省略 = BALANCE 0 による転倒（§15）。'air' = 着地の転倒（§17.6）。
+// エアの転倒は TURN SCORE の転倒回数には数えない（AIR の採点は STEP 6 で確定するため）
+function triggerFall(source){
+  if (source === 'air') G.airFalls++; else G.falls++;
+  G.fallTimer = CONFIG.fallStopTime;
+  G.fallRamp  = CONFIG.fallRampTime;
+  G.balance   = CONFIG.fallBalanceReset;   // 50 だと MISS 2〜3 回で再転倒ループになる
+  G.combo     = 0;
+  G.speed     = clamp(G.speed - CONFIG.fallSpeedLoss, CONFIG.minSpeed, CONFIG.maxSpeed);
+  // 倒れる向きは転倒開始時に固定する（§13.1(4)）。
+  // 毎フレーム swing の符号から決めると、中央へ戻る途中で転倒姿勢が左右反転する
+  G.fallDir = (G.player.x + G.player.sway) >= 0 ? 1 : -1;
+  G.player.targetX = 0;                    // 起き上がりはフォールラインを向く
+  G.lastTurnMs = null;
+  G.player.buck = 0;
+  G.player.compT = 999;                    // 吸収サイクルを止める
+  G.shakeX = CONFIG.shakeMiss * 1.8;
+  G.shakeY = CONFIG.shakeMiss * 1.4;
+  if (source !== 'air') showJudge(FALL_RESULT);   // エアは AIR FALL を出すので上書きしない
+}
+
+function applyResult(kind, m){
+  var R = RESULT[kind];
+  if (m) { m.judged = true; m.result = kind; m.judgedAt = G.time; }
+
+  // --- 選手の反応（視覚のみ。判定には影響しない）---
+  var pl = G.player;
+  pl.compQ = { perfect:1.0, good:0.82, ok:0.55, miss:0.22, majorMiss:0.12, whiff:0.45 }[kind];
+  if (kind === 'miss' || kind === 'majorMiss') pl.buck = 1;
+
+  G.counts[R.counter]++;
+
+  // --- BALANCE（§14）。乱れの蓄積量はこれ 1 本だけ。自然回復はさせない ---
+  G.balance = clamp(G.balance + R.balance, 0, CONFIG.startBalance);
+
+  // --- COMBO（§16）---
+  if      (R.combo === 'inc')   G.combo++;
+  else if (R.combo === 'reset') G.combo = 0;
+
+  // 吸収・伸展（§18.2(2)）は判定列から計算するので、ここでの積算は不要
+
+  applySpeed(R.delta, R.gain);
+  showJudge(R);
+
+  // 演出（§20）
+  if (kind === 'perfect' || kind === 'good') {
+    G.player.pop = CONFIG.playerPopTime;
+    spawnSpray(kind === 'perfect' ? CONFIG.sprayPerfect : CONFIG.sprayGood);
+  } else if (kind === 'miss' || kind === 'majorMiss') {
+    var dir = m ? -m.side : (G.player.targetX >= 0 ? -1 : 1);
+    G.player.sway += dir * CONFIG.swayMiss;
+    G.shakeX = CONFIG.shakeMiss;
+    G.shakeY = CONFIG.shakeMiss * 0.6;
+  } else if (kind === 'whiff') {
+    G.player.sway += (G.player.targetX >= 0 ? 1 : -1) * CONFIG.swayMiss * 0.35;
+  }
+
+  // --- 転倒（§15）。BALANCE が 0 になった場合のみ ---
+  if (G.balance <= 0 && G.fallTimer <= 0) triggerFall();
+}
+
+/* =========================================================================
+   ラン進行と採点（STEP 3。§18.2 / §19.2 / §27）
+   ========================================================================= */
+function startCountdown(){
+  hideOverlays();
+  G.phase = 'countdown';
+  G.countdown = CONFIG.countdownTime;
+}
+
+function finishRun(){
+  G.phase = 'finished';
+  G.resultTimer = CONFIG.finishDelay;
+  G.score = computeScore();
+  showJudge(FINISH_RESULT);
+}
+
+/* §18.2(2) 吸収・伸展 ＝ リンク重み方式（v2.4）
+   隣り合うコブの「つなぎ目」を 1 本ずつ評価し、両端のうち弱いほうの値を採る。
+   判定列そのものから計算するので COMBO の仕様には依存しない。
+   未判定のコブ（滑走中の呼び出し）は重み 0 として扱う。 */
+function absorbLinkSum(){
+  var cw = CONFIG.chainWeight, sum = 0;
+  for (var i = 0; i < G.moguls.length - 1; i++) {
+    var a = cw[G.moguls[i].result],     b = cw[G.moguls[i + 1].result];
+    sum += Math.min(a === undefined ? 0 : a, b === undefined ? 0 : b);
+  }
+  return sum;
+}
+
+/* §18.3 AIR SCORE。
+   airValue の作り方（§17.3.2 のセット係数・§17.5 の Quality × DD）は変えていない。
+   ★リピート規定（FIS Judging Handbook 6204.3.8）：同じ技を 2 本跳んだら、
+   カウントされるのは最初の scoring jump だけ。1 本目が転倒していても 2 本目は 0 点になる。
+   判定するのは「同じ技を繰り返したか」であって「1 本目が上手だったか」ではない。 */
+function computeAirScore(){
+  var seen = {}, sum = 0, repeated = false;
+  var list = G.airs.map(function(a){
+    var counted = true;
+    if (!CONFIG.airRepeatCounts && seen[a.trick]) { counted = false; repeated = true; }
+    seen[a.trick] = true;
+    var v = (a.value === null || a.value === undefined) ? 0 : a.value;
+    if (counted) sum += v;
+    return { index:a.index, trick:a.trick, label:a.label, dd:a.dd,
+             result:a.result, quality:a.quality, value:a.value, deltaMs:a.deltaMs,
+             setResult:a.setResult, setDeltaM:a.setDeltaM,
+             setFactor:a.setFactor, qualityLanding:a.qualityLanding,
+             counted: counted };
+  });
+  return { airs: list, score: clamp(sum, 0, CONFIG.airScoreMax), repeated: repeated };
+}
+
+/* §18.4 TIME SCORE。v4.2 で FIS の Speed scoring の式そのものに変更した。
+   基準速度（paceSpeed）だけをゲームに合わせている。非線形化はしない */
+function paceTimeSec(){
+  // ★秒数を直接書かず、毎回コース長から求める（コース長を変えたら追従する）
+  return CONFIG.paceSpeed > 0 ? CONFIG.courseLengthM / CONFIG.paceSpeed : 0;
+}
+
+function computeTimeScore(T){
+  var pace = paceTimeSec();
+  if (pace <= 0) return 0;
+  return clamp(CONFIG.paceScoreBase - CONFIG.paceScoreSlope * (T / pace), 0, CONFIG.timeScoreMax);
+}
+
+// §18.2 の式。数値はすべて CONFIG から取る
+function computeScore(){
+  var mogulCount = G.moguls.length;
+
+  // (1) カービング 50% ← 判定の内訳。分母はターンコブ総数で固定（無入力通過も分母に入る）
+  var w = CONFIG.carveWeight;
+  var carveSum = G.counts.perfect * w.perfect + G.counts.good * w.good +
+                 G.counts.ok      * w.ok      + G.counts.miss * w.miss +
+                 G.counts.majorMiss * w.majorMiss;
+  var carve = mogulCount > 0 ? carveSum / mogulCount : 0;
+
+  // (2) 吸収・伸展 25% ← リズムの連続性（つなぎ目 59 本のリンク重み。§18.2(2)）
+  var linkSum = absorbLinkSum();
+  var absorb  = mogulCount > 1 ? clamp(linkSum / (mogulCount - 1), 0, 1) : 0;
+
+  // (3) 上体 25% ← 平均BALANCE（時間平均）
+  var avgBalance = G.balanceTime > 0 ? G.balanceSum / G.balanceTime : CONFIG.startBalance;
+  var upper = clamp((avgBalance - CONFIG.balanceScoreFloor) /
+                    (CONFIG.startBalance - CONFIG.balanceScoreFloor), 0, 1);
+
+  // (4) 減点 ← 転倒・完全停止のみ。MISS / WHIFF は carve の重みで既に反映済み。
+  // v4.0 でエアの転倒を airFallWeight 倍で加算（§18.2(4)）
+  var fallCount = G.falls + CONFIG.airFallWeight * G.airFalls;
+  var penalty = (fallCount * CONFIG.deductFall + G.stops * CONFIG.deductStop) * CONFIG.penaltyScale;
+
+  var turnBase = 0.50 * carve + 0.25 * absorb + 0.25 * upper;
+  var base  = CONFIG.turnScoreMax * turnBase;
+  var total = clamp(base - penalty, 0, CONFIG.turnScoreMax);
+
+  var air = computeAirScore();
+  var timeScore = computeTimeScore(G.runTime);
+
+  return {
+    time: G.runTime,
+    carve: carve, absorb: absorb, upper: upper,
+    avgBalance: avgBalance,
+    carvePts:  CONFIG.turnScoreMax * 0.50 * carve,
+    absorbPts: CONFIG.turnScoreMax * 0.25 * absorb,
+    upperPts:  CONFIG.turnScoreMax * 0.25 * upper,
+    turnBase: turnBase, base: base, penalty: penalty, total: total,
+    counts: G.counts, falls: G.falls, linkSum: linkSum, mogulCount: mogulCount,
+    difficulty: G.difficulty,
+    airFalls: G.airFalls,
+
+    // --- AIR SCORE（§18.3）---
+    airs: air.airs, airScore: air.score, repeated: air.repeated,
+
+    // --- TIME SCORE（§18.4）---
+    timeScore: timeScore,
+
+    // --- TOTAL（§18.5）。★100 に正規化しない。いまの理論最大は 97.6 ---
+    totalScore: total + air.score + timeScore
+  };
+}
+
+/* =========================================================================
+   入力（§6）
+   ========================================================================= */
+var heldDirs = new Set();          // 左右同時押しは先に押された方を採用
+var pointerDirs = new Map();
+
+function eventTimeMs(e){
+  var t = e.timeStamp;
+  var now = performance.now();
+  // timeStamp が time origin 基準でない環境へのフォールバック
+  if (typeof t !== 'number' || !isFinite(t) || t <= 0 || Math.abs(t - now) > 1000) t = now;
+  return t;
+}
+
+function pressDir(dir, tMs){
+  if (heldDirs.size > 0 && !heldDirs.has(dir)) return;   // 反対側が押されたまま → 無視
+  heldDirs.add(dir);
+  handleTurnInput(dir, tMs);
+}
+
+window.addEventListener('keydown', function(e){
+  if (e.repeat) return;                                  // キーリピート無効（§6）
+  var k = e.key;
+  var dir = 0;
+  if (k === 'ArrowLeft'  || k === 'a' || k === 'A') dir = SIDE_LEFT;
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') dir = SIDE_RIGHT;
+  if (!dir) return;
+  e.preventDefault();
+  pressDir(dir, eventTimeMs(e));
+}, { passive:false });
+
+window.addEventListener('keyup', function(e){
+  var k = e.key;
+  if (k === 'ArrowLeft'  || k === 'a' || k === 'A') heldDirs.delete(SIDE_LEFT);
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') heldDirs.delete(SIDE_RIGHT);
+});
+
+stage.addEventListener('pointerdown', function(e){
+  if (e.target.closest('button')) return;                // HUD ボタンは対象外
+  e.preventDefault();
+  var rect = stage.getBoundingClientRect();
+  var dir = (e.clientX - rect.left) < rect.width / 2 ? SIDE_LEFT : SIDE_RIGHT;
+  pointerDirs.set(e.pointerId, dir);
+  pressDir(dir, eventTimeMs(e));                         // pointerdown 1回 = 1入力
+}, { passive:false });
+
+function releasePointer(e){
+  var dir = pointerDirs.get(e.pointerId);
+  if (dir !== undefined) { pointerDirs.delete(e.pointerId); heldDirs.delete(dir); }
+}
+stage.addEventListener('pointerup', releasePointer);
+stage.addEventListener('pointercancel', releasePointer);
+window.addEventListener('blur', function(){ heldDirs.clear(); pointerDirs.clear(); });
+window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+// RESTART / RETRY は同じ seed で同じコースを作り直し、そのままカウントダウンへ（§27）
+document.getElementById('btnRestart').addEventListener('click', function(){ resetGame(); startCountdown(); });
+document.getElementById('btnRetry').addEventListener('click',   function(){ resetGame(); startCountdown(); });
+document.getElementById('btnStart').addEventListener('click',   function(){ startCountdown(); });
+// 難易度切替（§7.4）。選び直したらコースを作り直す（本数・区間境界・CL は変わらない）
+(function(){
+  var btns = document.querySelectorAll('.diffbtn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener('click', function(){
+      CONFIG.difficulty = this.getAttribute('data-diff');
+      resetGame();
+      showStartOverlay();
+    });
+  }
+  // AIR 1 / AIR 2 の技を事前選択（§17.2）。滑走中は変更できない
+  var tb = document.querySelectorAll('.trickbtn');
+  for (var t = 0; t < tb.length; t++) {
+    tb[t].addEventListener('click', function(){
+      var which = this.getAttribute('data-air');
+      if (which === '2') CONFIG.selectedAir2 = this.getAttribute('data-trick');
+      else               CONFIG.selectedAir1 = this.getAttribute('data-trick');
+      resetGame();
+      showStartOverlay();
+    });
+  }
+})();
+document.getElementById('btnDebug').addEventListener('click', function(){
+  showDebug = !showDebug;
+  this.textContent = 'DEBUG ' + (showDebug ? 'ON' : 'OFF');
+  elDebug.classList.toggle('hidden', !showDebug);
+  layoutJudgeText();                 // 下部の高さが変わるので判定表示を置き直す
+});
+document.getElementById('btnWindows').addEventListener('click', function(){
+  showWindows = !showWindows;
+  this.textContent = '窓 ' + (showWindows ? 'ON' : 'OFF');
+});
+
+/* =========================================================================
+   演出
+   ========================================================================= */
+function showJudge(R){
+  if (!R) { elJudge.className = 'hud'; elJudge.textContent = ''; return; }
+  elJudge.className = 'hud';
+  elJudge.textContent = R.label;
+  void elJudge.offsetWidth;                              // アニメーション再始動
+  elJudge.className = 'hud show ' + R.cls;
+}
+
+/* ---- オーバーレイ（§19.2）---- */
+function hideOverlays(){
+  elStartOv.classList.add('hidden');
+  elResultOv.classList.add('hidden');
+  elCountdn.classList.add('hidden');
+}
+
+// 難易度の表示名と説明（§7.4）
+var DIFF_LABEL = { beginner:'初級', intermediate:'中級', advanced:'上級' };
+var DIFF_NOTE  = {
+  beginner:     'コブ間隔は一定。リズムを覚える',
+  intermediate: '中間部だけ間隔が揺らぐ',
+  advanced:     '全区間で間隔が揺らぐ（基準）'
+};
+
+// 生成されたコースの実際のコブ間隔（m）。区間をまたぐ間隔（エア区間）は除く
+function spacingRangeText(){
+  var M = G.moguls, mn = Infinity, mx = -Infinity;
+  for (var i = 1; i < M.length; i++) {
+    if (M[i].section !== M[i - 1].section) continue;
+    var g = (M[i].d - M[i - 1].d) / CONFIG.pxPerMeter;
+    if (g < mn) mn = g;
+    if (g > mx) mx = g;
+  }
+  if (!isFinite(mn)) return '';
+  return (mx - mn < 0.005) ? mn.toFixed(2) + ' m 固定'
+                           : mn.toFixed(2) + '〜' + mx.toFixed(2) + ' m';
+}
+
+function showStartOverlay(){
+  document.getElementById('ovCourse').textContent = courseMeters().toFixed(0) + ' m';
+  document.getElementById('ovTurns').textContent  = G.moguls.length;   // 生成された本数（§19.2）
+  document.getElementById('ovAir').textContent    = CONFIG.airZoneM + ' m × ' + G.airZones.length;
+  // 生成されたコースの実際のコブ間隔レンジ（§7.4 の表と同じ値。ハードコードしない）
+  document.getElementById('diffNote').textContent =
+    (DIFF_NOTE[CONFIG.difficulty] || '') + '　' + spacingRangeText();
+
+  // AIR 1 / AIR 2 の技（§17.2 事前選択）。同じ技を選んでよい（Variety は STEP 6）
+  var sel = { '1': CONFIG.selectedAir1, '2': CONFIG.selectedAir2 };
+  var tb = document.querySelectorAll('.trickbtn');
+  for (var t = 0; t < tb.length; t++) {
+    var ai = tb[t].getAttribute('data-air');
+    tb[t].classList.toggle('on', tb[t].getAttribute('data-trick') === sel[ai]);
+  }
+  var t1 = CONFIG.airTricks[CONFIG.selectedAir1], t2 = CONFIG.airTricks[CONFIG.selectedAir2];
+  document.getElementById('trickNote').textContent =
+    'AIR 1 ' + t1.label + ' (DD ' + t1.dd.toFixed(2) + ')　/　AIR 2 ' +
+    t2.label + ' (DD ' + t2.dd.toFixed(2) + ')';
+  // 同じ技を選んでいる間は警告を出す（§18.3）。選択そのものは禁止しない
+  document.getElementById('repeatWarn').textContent =
+    (!CONFIG.airRepeatCounts && CONFIG.selectedAir1 === CONFIG.selectedAir2)
+      ? 'REPEAT — AIR 2 はカウントされません' : '';
+  var btns = document.querySelectorAll('.diffbtn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('on', btns[i].getAttribute('data-diff') === CONFIG.difficulty);
+  }
+  elResultOv.classList.add('hidden');
+  elStartOv.classList.remove('hidden');
+}
+
+// 公式コース長＝スタートゲート〜フィニッシュライン（§7.3 v2.4 で訂正）。
+// 助走 + コブ区間 + ランアウト。コブ区間だけの長さ（234 m）ではない
+function courseMeters(){
+  return G.finishD / CONFIG.pxPerMeter;
+}
+
+function showResult(){
+  var s = G.score;
+  if (!s) return;
+  var f1 = function(v){ return v.toFixed(1); };
+  // 難易度が違えばスコアは直接比較できないので必ず出す（§7.4 守ること 4 / §19.2）
+  document.getElementById('resDiff').textContent    =
+    (DIFF_LABEL[s.difficulty] || s.difficulty) + '　COURSE ' + s.mogulCount + ' TURNS';
+  document.getElementById('resTime').textContent    = s.time.toFixed(2);
+  document.getElementById('resScore').textContent   = f1(s.total);
+  document.getElementById('resCarve').textContent   = s.carve.toFixed(2);
+  document.getElementById('resCarveP').textContent  = f1(s.carvePts);
+  document.getElementById('resAbsorb').textContent  = s.absorb.toFixed(2);
+  document.getElementById('resAbsorbP').textContent = f1(s.absorbPts);
+  document.getElementById('resUpper').textContent   = s.upper.toFixed(2);
+  document.getElementById('resUpperP').textContent  = f1(s.upperPts);
+  document.getElementById('resBase').textContent    = f1(s.base);
+  document.getElementById('resPenalty').textContent = s.penalty > 0 ? '−' + f1(s.penalty) : '0.0';
+  document.getElementById('resFalls').textContent   =
+    s.falls + (s.airFalls ? ' ＋ エア ' + s.airFalls + '×' + CONFIG.airFallWeight : '');
+  // TOTAL / AIR / TIME（§18.3〜18.5）。★100 に正規化しない
+  document.getElementById('resTotal').textContent     = s.totalScore.toFixed(2);
+  document.getElementById('resTotalMax').textContent  = CONFIG.totalScoreMax;
+  document.getElementById('resAirScore').textContent  = s.airScore.toFixed(2);
+  document.getElementById('resTimeScore').textContent = s.timeScore.toFixed(1);
+  // AIR の内訳（§18.3）。リピートでカウントされなかった本数が読めるようにする
+  document.getElementById('resAir').innerHTML = s.airs.map(function(a){
+    return 'AIR ' + a.index + ': ' + a.label +
+      (a.counted ? '' : '　<b>［リピート：カウントなし］</b>') +
+      (a.result ? '　' + AIR_RESULT[a.result].label : '　未通過') +
+      (a.setResult ? '　/　' + SET_LABEL[a.setResult] +
+         (a.setDeltaM === null ? '（無入力）'
+          : '（' + (a.setDeltaM >= 0 ? '+' : '') + a.setDeltaM.toFixed(2) + 'm）') : '') +
+      (a.quality === null ? '' :
+        '<br>　着地 Q ' + a.qualityLanding.toFixed(1) + ' × セット ' + a.setFactor.toFixed(2) +
+        ' = Q ' + a.quality.toFixed(1) + ' × DD ' + a.dd.toFixed(2) +
+        ' = <b>' + a.value.toFixed(2) + '</b>' +
+        (a.deltaMs === null ? '　（着地は無入力）'
+                            : '　着地ずれ ' + (a.deltaMs >= 0 ? '+' : '') + a.deltaMs.toFixed(0) + 'ms'));
+  }).join('<br>');
+  document.getElementById('resRepeat').innerHTML = s.repeated
+    ? '同じ技を 2 本跳んだため、2 本目は AIR SCORE に加算されていません（FIS のリピート規定）' : '';
+
+  var c = s.counts;
+  document.getElementById('resCounts').innerHTML =
+    'PERFECT ' + c.perfect + '　GOOD ' + c.good + '　OK ' + c.ok + '<br>' +
+    'MISS ' + c.miss + '　MAJOR ' + c.majorMiss + '　WHIFF ' + c.whiff;
+  document.getElementById('resExtra').innerHTML =
+    '判定合計 ' + (c.perfect + c.good + c.ok + c.miss + c.majorMiss) + ' / ' + s.mogulCount +
+    '　つなぎ目 ' + s.linkSum.toFixed(1) + ' / ' + (s.mogulCount - 1) +
+    '　平均BALANCE ' + s.avgBalance.toFixed(1);
+  elResultOv.classList.remove('hidden');
+}
+
+/* ---- 進行バーのエア区間マーカー（コースごとに1回作る）---- */
+function buildProgressMarks(){
+  var old = elProgOut.querySelectorAll('.progAir');
+  for (var i = 0; i < old.length; i++) old[i].remove();
+  for (var z = 0; z < G.airZones.length; z++) {
+    var a = G.airZones[z];
+    var el = document.createElement('div');
+    el.className = 'progAir';
+    el.style.left  = (a.start / G.finishD * 100).toFixed(2) + '%';
+    el.style.width = ((a.end - a.start) / G.finishD * 100).toFixed(2) + '%';
+    elProgOut.insertBefore(el, elProgBar);
+  }
+}
+
+function spawnSpray(n){
+  var s = persp(view.judgeY);
+  for (var i = 0; i < n; i++) {
+    var a = hash01(G.counts.perfect * 97 + G.counts.good * 31 + i * 7 + 1);
+    var b = hash01(i * 131 + G.moguls.length * 17 + 3);
+    G.particles.push({
+      x: view.W / 2 + G.player.x * s,
+      y: view.judgeY + 8 * s,
+      vx: (a * 2 - 1) * 150 - G.player.targetX * 1.4,
+      vy: -60 - b * 130,
+      life: 0.30 + b * 0.28,
+      age: 0,
+      r: 1.2 + a * 1.8
+    });
+  }
+}
+
+/* =========================================================================
+   更新
+   ========================================================================= */
+function update(now){
+  var dt = (now - G.lastMs) / 1000;
+  if (dt < 0) dt = 0;
+  dt = Math.min(dt, CONFIG.maxFrameDt);
+
+  G.time += dt;
+
+  // --- フェーズ進行（§19.2 スタート → 滑走 → フィニッシュ）---
+  if (G.phase === 'countdown') {
+    G.countdown = Math.max(0, G.countdown - dt);
+    if (G.countdown <= 0) G.phase = 'running';
+  }
+  if (G.phase === 'running') {
+    G.runTime += dt;                                  // 計測タイム（フィニッシュで止まる）
+    G.balanceSum  += G.balance * dt;                  // 平均BALANCE は時間平均（§18.2(3)）
+    G.balanceTime += dt;
+  } else if (G.phase === 'finished' && G.resultTimer > 0) {
+    G.resultTimer = Math.max(0, G.resultTimer - dt);
+    if (G.resultTimer <= 0) showResult();
+  }
+
+  // 転倒中はコースを止める（§15「約 1.0 秒停止」）。復帰時は短く立ち上げる
+  if (G.fallTimer > 0) {
+    G.fallTimer = Math.max(0, G.fallTimer - dt);
+    G.scrollFactor = 0;
+  } else if (G.fallRamp > 0) {
+    G.fallRamp = Math.max(0, G.fallRamp - dt);
+    G.scrollFactor = CONFIG.fallRampTime > 0 ? 1 - G.fallRamp / CONFIG.fallRampTime : 1;
+  } else {
+    G.scrollFactor = 1;
+  }
+  if (G.phase === 'ready' || G.phase === 'countdown') G.scrollFactor = 0;   // スタート前は動かない
+
+  G.playerD += CONFIG.baseScroll * G.speed * G.scrollFactor * dt;   // speed はスクロール速度倍率のみ（§12.2）
+  G.lastMs = now;
+
+  resolvePassed(G.playerD);
+
+  if (G.phase === 'running') updateAir(dt);        // AIR 1（§17）
+
+  // エア進入中はカメラをわずかに前方へ寄せる（§17.3 APPROACH）。
+  // コブが判定に絡む位置にいるときは必ず 0 に戻す（描画と判定がずれないように）
+  var camTarget = 0;
+  var camAir = activeAir(G.playerD);
+  if (camAir && (camAir.stage === 'approach' || camAir.stage === 'takeoff' || camAir.stage === 'flight')) {
+    camTarget = CONFIG.airCamShift;
+  }
+  G.camShift += (camTarget - G.camShift) * (1 - Math.exp(-CONFIG.airCamLerp * dt));
+  if (Math.abs(G.camShift) < 0.3) G.camShift = 0;
+
+  // フィニッシュ（最終コブ通過後 runOutGaps 進んだ地点。§27）
+  if (G.phase === 'running' && G.playerD >= G.finishD) finishRun();
+
+  // 選手の横移動（一次遅れ＝慣性。視覚のみ）
+  var p = G.player;
+
+  // 入力が途切れたらニュートラルへ戻す（§13.1(4)）。モーグルはターンしていないとき中央にいる。
+  // ★エア区間の中では戻さない。セット入力（§17.3.2）が中央へ戻す操作そのものなので、
+  //   ここで自動的に戻すと NO SET でも中央に戻ってしまい、セットの意味が消える
+  var inAirZone = inAnyAirZone(G.playerD);      // 第1・第2エアの両方を除外（§29）
+  if (p.targetX !== 0 && G.lastTurnMs !== null && !inAirZone) {
+    var idleLimit = (CONFIG.baseTurnInterval / G.speed) * CONFIG.neutralIdleTurns;
+    if ((G.lastMs - G.lastTurnMs) / 1000 > idleLimit) {
+      p.targetX = 0; G.lastTurnMs = null; G.neutralReturns++;
+    }
+  }
+  // 中央へ戻すときだけ neutralReturnTime の速さを使う。ターン中の追従（playerLerp）は変えない
+  var lerpRate = (p.targetX === 0 && CONFIG.neutralReturnTime > 0)
+    ? 3 / CONFIG.neutralReturnTime      // 時定数の 3 倍でほぼ戻り切る
+    : CONFIG.playerLerp;
+  var k = 1 - Math.exp(-lerpRate * dt);
+  p.x += (p.targetX - p.x) * k;
+  p.sway *= Math.exp(-CONFIG.swayDecay * dt);
+  p.pop = Math.max(0, p.pop - dt);
+
+  // セット成立時はニュートラル（中央）へ戻す（§17.3.2）。NO SET のときは振れたまま
+  var ar = activeAir(G.playerD);
+  if (ar && ar.setCenterT > 0 && ar.setResult && ar.setResult !== 'none') {
+    var ct = 1 - ar.setCenterT / CONFIG.airSetCenterTime;      // 0 → 1
+    var ease = 1 - Math.pow(1 - ct, 3);
+    p.x = ar.setCenterFrom * (1 - ease);
+    p.sway = 0;
+    p.targetX = 0;
+  }
+  p.lean = clamp((p.targetX - p.x) / CONFIG.playerOffsetX, -1, 1);
+
+  // 吸収。1 = 最も畳まれる / 負 = 伸び上がる
+  p.compT += dt;
+  var targetComp = 0;
+  if (CONFIG.absorbEnabled) {
+    if (CONFIG.absorbFollowsInput) {
+      // タップを起点に「畳む → 伸びる」を1サイクル。速度が上がるとサイクルも速くなる
+      var dur = (gapPx / (CONFIG.baseScroll * G.speed)) * CONFIG.absorbCycle;
+      // タップの瞬間が最も畳まれた状態。そこから谷へ向かって伸びていく。
+      // 実際の吸収も「コブに当たった瞬間に脚が畳まれ、そのあと谷へ伸ばす」順序なので、
+      // ここを緩やかに立ち上げるとピークがコブ通過より遅れ、早押しのほうが綺麗に見えてしまう。
+      var u = p.compT / dur;
+      if (u < 1) {
+        targetComp = 1 - (1 + CONFIG.absorbExtend) * (1 - Math.cos(u * Math.PI)) / 2;
+      } else {
+        targetComp = -CONFIG.absorbExtend * Math.exp(-(u - 1) * 3);         // 伸びたまま中立へ
+      }
+    } else {
+      var nearest = Infinity;
+      for (var mi = 0; mi < G.moguls.length; mi++) {
+        var rr = Math.abs(G.moguls[mi].d - G.playerD) / gapPx;
+        if (rr < nearest) nearest = rr;
+      }
+      targetComp = clamp(1 - nearest / CONFIG.absorbRange, -CONFIG.absorbExtend, 1);
+    }
+  }
+  p.comp += (targetComp - p.comp) * (1 - Math.exp(-CONFIG.absorbLerp * dt));
+  p.buck *= Math.exp(-CONFIG.buckDecay * dt);
+
+  // 乱れは BALANCE から導出する（§14.1）。独立した蓄積量は持たない
+  var disturbTarget = CONFIG.lineDriftEnabled
+    ? 1 - clamp(G.balance / CONFIG.startBalance, 0, 1)
+    : 0;
+  p.disturb += (disturbTarget - p.disturb) * (1 - Math.exp(-CONFIG.lineLerp * dt));
+  // 乱れは「ターンとは別周期のゆっくりした横揺れ」として出す（§13.1(3)）
+  var f = CONFIG.lineWanderFreq;
+  p.line = p.disturb * CONFIG.lineDriftMax *
+           (Math.sin(G.time * f) * 0.72 + Math.sin(G.time * f * 0.56 + 1.3) * 0.28);
+
+  // 転倒姿勢（描画のみ）
+  var fallTo = G.fallTimer > 0 ? 1 : 0;
+  G.fallAnim += (fallTo - G.fallAnim) * (1 - Math.exp(-CONFIG.fallAnimLerp * dt));
+
+  G.shakeX *= Math.exp(-CONFIG.shakeDecay * dt);
+  G.shakeY *= Math.exp(-CONFIG.shakeDecay * dt);
+
+  for (var i = G.particles.length - 1; i >= 0; i--) {
+    var q = G.particles[i];
+    q.age += dt;
+    if (q.age >= q.life) { G.particles.splice(i, 1); continue; }
+    q.x += q.vx * dt;
+    q.y += q.vy * dt;
+    q.vy += 520 * dt;
+  }
+
+  G.hudAcc += dt;
+  if (G.hudAcc >= CONFIG.hudInterval) { G.hudAcc = 0; updateHud(); }
+}
+
+/* =========================================================================
+   描画（Canvas 2D。§22.4）
+   ========================================================================= */
+function persp(y){                                        // 疑似奥行き（視覚のみ）
+  var t = clamp(y / view.H, 0, 1);
+  return CONFIG.perspectiveMin + (1 - CONFIG.perspectiveMin) * t;
+}
+
+function render(){
+  // カメラ寄せ（§17.3）は選手も世界もまとめて動かす。
+  // こうすると「コブ中心が選手の位置に来た瞬間が ratio 0」の関係が崩れない
+  var W = view.W, H = view.H, judgeY = view.judgeY - G.camShift, cx = W / 2;
+
+  ctx.setTransform(view.scale * view.dpr, 0, 0, view.scale * view.dpr, 0, 0);
+  // 画面揺れ（MISS 時。減衰する振動）
+  if (G.shakeX > 0.05 || G.shakeY > 0.05) {
+    ctx.translate(G.shakeX * Math.sin(G.time * 62), G.shakeY * Math.sin(G.time * 47));
+  }
+
+  // 背景
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#cfe0f0');
+  g.addColorStop(0.55, '#eaf3fb');
+  g.addColorStop(1, '#f7fbff');
+  ctx.fillStyle = g;
+  ctx.fillRect(-40, -40, W + 80, H + 80);
+
+  // コース面
+  var hwTop = CONFIG.courseHalfWidth * persp(0);
+  var hwBot = CONFIG.courseHalfWidth * persp(H);
+  ctx.beginPath();
+  ctx.moveTo(cx - hwTop, 0); ctx.lineTo(cx + hwTop, 0);
+  ctx.lineTo(cx + hwBot, H); ctx.lineTo(cx - hwBot, H);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  // 雪面の粒（速度感）
+  ctx.fillStyle = 'rgba(150,178,203,.55)';
+  var sg = CONFIG.speckleGap;
+  var kStart = Math.ceil((G.playerD - (H - judgeY)) / sg);
+  var kEnd   = Math.floor((G.playerD + judgeY) / sg);
+  for (var kk = kStart; kk <= kEnd; kk++) {
+    var wy = judgeY - (kk * sg - G.playerD);
+    var s = persp(wy);
+    var wx = cx + (hash01(kk) * 2 - 1) * CONFIG.courseHalfWidth * 0.94 * s;
+    ctx.fillRect(wx, wy, 1.6 * s, 1.6 * s);
+  }
+
+  // エア区間（§7.3。STEP 3 ではコブを置かない空白区間。ジャンプは作らない）
+  for (var az = 0; az < G.airZones.length; az++) drawAirZone(G.airZones[az], cx, judgeY);
+
+  // フィニッシュライン（§27 最終コブ通過後 runOutGaps）
+  drawFinishLine(cx, judgeY);
+
+  // コース境界
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(38,86,138,.35)';
+  ctx.setLineDash([10, 9]);
+  ctx.beginPath();
+  ctx.moveTo(cx - hwTop, 0); ctx.lineTo(cx - hwBot, H);
+  ctx.moveTo(cx + hwTop, 0); ctx.lineTo(cx + hwBot, H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 判定窓の可視化（デバッグ用トグル）
+  if (showWindows) {
+    drawBand(judgeY, CONFIG.targetSegment, 'rgba(192,57,43,.10)');
+    drawBand(judgeY, CONFIG.okWindow,      'rgba(200,170,20,.13)');
+    drawBand(judgeY, CONFIG.goodWindow,    'rgba(22,103,200,.13)');
+    drawBand(judgeY, CONFIG.perfectWindow, 'rgba(15,138,95,.18)');
+  }
+
+  // コントロールゲート（実際のモーグルコースの赤／青ゲート。判定には一切関与しない）
+  var gateStep = gapPx * CONFIG.gateEveryGaps;
+  var gStart = Math.ceil((G.playerD - (H - judgeY)) / gateStep);
+  var gEnd   = Math.floor((G.playerD + judgeY) / gateStep);
+  for (var gi = gEnd; gi >= gStart; gi--) {          // 奥から手前へ
+    var gy = judgeY - (gi * gateStep - G.playerD);
+    var gcol = (gi % 2 === 0) ? CONFIG.gateColorRed : CONFIG.gateColorBlue;
+    drawGate(cx, gy, -1, gcol);
+    drawGate(cx, gy,  1, gcol);
+  }
+
+  // コブ（奥＝配列後方から描く）
+  for (var i = G.moguls.length - 1; i >= 0; i--) drawMogul(G.moguls[i], cx, judgeY);
+
+  // TURN JUDGE LINE（§5.1）
+  ctx.strokeStyle = 'rgba(20,70,120,.55)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.moveTo(cx - hwBot * 1.02, judgeY);
+  ctx.lineTo(cx + hwBot * 1.02, judgeY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(20,70,120,.6)';
+  ctx.font = '9px ui-monospace,Consolas,monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('TURN JUDGE LINE', cx - hwBot * 1.02, judgeY - 5);
+
+  // 雪しぶき
+  for (var j = 0; j < G.particles.length; j++) {
+    var q = G.particles[j];
+    ctx.globalAlpha = clamp(1 - q.age / q.life, 0, 1) * 0.9;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(140,175,205,.7)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  drawPlayer(cx, judgeY);
+}
+
+/* コントロールゲート：コース左右の境界に立つ旗竿（赤／青）。視覚表現のみ */
+function drawGate(cx, y, side, color){
+  if (y < -50 || y > view.H + 50) return;
+  var s = persp(y);
+  var x = cx + side * CONFIG.courseHalfWidth * s;
+  var h = CONFIG.gateHeight * s;
+  var pw = CONFIG.gatePanelW * s;
+  var ph = CONFIG.gatePanelH * s;
+
+  // 雪面の影
+  ctx.fillStyle = 'rgba(110,145,180,.30)';
+  ctx.beginPath();
+  ctx.ellipse(x + side * 2 * s, y + 1.5 * s, 5.5 * s, 2 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ポール
+  ctx.strokeStyle = 'rgba(34,50,66,.9)';
+  ctx.lineWidth = Math.max(1.2, 2.8 * s);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y - h);
+  ctx.stroke();
+
+  // 旗（コース内側へ向ける）
+  var px = side < 0 ? x : x - pw;
+  var py = y - h;
+  ctx.fillStyle = color;
+  ctx.fillRect(px, py, pw, ph);
+  ctx.strokeStyle = 'rgba(255,255,255,.75)';
+  ctx.lineWidth = Math.max(0.6, 0.9 * s);
+  ctx.strokeRect(px, py, pw, ph);
+}
+
+/* エア区間：コブのない緩斜面＋区間ライン（§7.3）。判定には一切関与しない */
+function drawAirZone(zone, cx, judgeY){
+  var yTop = judgeY - (zone.end   - G.playerD);     // 奥（上）＝ d が大きい側
+  var yBot = judgeY - (zone.start - G.playerD);
+  if (yBot < -20 || yTop > view.H + 20) return;
+
+  // 帯（台形。奥ほど狭い）
+  var hwT = CONFIG.courseHalfWidth * persp(yTop);
+  var hwB = CONFIG.courseHalfWidth * persp(yBot);
+  ctx.fillStyle = CONFIG.airTint;
+  ctx.beginPath();
+  ctx.moveTo(cx - hwT, yTop); ctx.lineTo(cx + hwT, yTop);
+  ctx.lineTo(cx + hwB, yBot); ctx.lineTo(cx - hwB, yBot);
+  ctx.closePath();
+  ctx.fill();
+
+  // 区間ライン（入口・出口）
+  ctx.strokeStyle = 'rgba(11,111,208,.55)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([9, 7]);
+  ctx.beginPath();
+  ctx.moveTo(cx - hwT, yTop); ctx.lineTo(cx + hwT, yTop);
+  ctx.moveTo(cx - hwB, yBot); ctx.lineTo(cx + hwB, yBot);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ラベル。第1エアはジャンプ台を描くので、ラベルは区間の入口寄りに置く
+  var zoneAir = airOfZone(zone.index);
+  var hasJump = !!zoneAir;
+  var ly = hasJump ? yBot - 14 : (yTop + yBot) / 2;
+  if (ly > 10 && ly < view.H - 10) {
+    ctx.fillStyle = 'rgba(11,79,138,.42)';
+    ctx.font = '700 13px ui-monospace,Consolas,monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('AIR ' + zone.index, cx, ly + 4);
+    ctx.textAlign = 'left';
+  }
+  if (hasJump) drawAirJump(cx, judgeY, zoneAir);
+}
+
+/* エア台と着地帯（§17.3）。判定には関与しない純粋な視覚表現 */
+function drawAirJump(cx, judgeY, a){
+  if (!a) return;
+
+  // --- 着地帯（LZ）。ここが選手の位置まで来た瞬間が理想の着地 ---
+  var yLand = judgeY - (a.dLand - G.playerD);
+  var yLzEnd = judgeY - (a.dEnd - G.playerD);
+  if (yLand > -40 && yLzEnd < view.H + 40) {
+    var hwL = CONFIG.courseHalfWidth * persp(yLand);
+    var g = ctx.createLinearGradient(0, yLzEnd, 0, yLand);
+    g.addColorStop(0, 'rgba(120,170,215,0)');
+    g.addColorStop(1, 'rgba(120,170,215,.30)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - hwL, yLzEnd, hwL * 2, yLand - yLzEnd);
+    // 着地ライン
+    ctx.strokeStyle = 'rgba(20,90,150,.75)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - hwL * 0.86, yLand);
+    ctx.lineTo(cx + hwL * 0.86, yLand);
+    ctx.stroke();
+  }
+
+  // --- エア台（キッカー）。リップに向かって盛り上がる ---
+  var yLip = judgeY - (a.dLip - G.playerD);
+  var yFoot = judgeY - (a.dTakeoff - G.playerD);
+  if (yLip > view.H + 60 || yFoot < -60) return;
+  var s = persp(yLip);
+  var hw = CONFIG.courseHalfWidth * persp(yFoot) * 0.62;
+  var hwTop = CONFIG.courseHalfWidth * s * 0.52;
+  var lipH = CONFIG.airRampHeight * s;
+
+  // 斜面（下から見て手前が低く、リップで持ち上がる）
+  var rg = ctx.createLinearGradient(0, yFoot, 0, yLip - lipH);
+  rg.addColorStop(0, '#e9f1f9');
+  rg.addColorStop(1, '#ffffff');
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(cx - hw, yFoot);
+  ctx.lineTo(cx - hwTop, yLip - lipH);
+  ctx.lineTo(cx + hwTop, yLip - lipH);
+  ctx.lineTo(cx + hw, yFoot);
+  ctx.closePath();
+  ctx.fill();
+
+  // 台の影（側面）
+  ctx.fillStyle = 'rgba(120,155,190,.28)';
+  ctx.beginPath();
+  ctx.moveTo(cx - hwTop, yLip - lipH);
+  ctx.lineTo(cx + hwTop, yLip - lipH);
+  ctx.lineTo(cx + hwTop, yLip);
+  ctx.lineTo(cx - hwTop, yLip);
+  ctx.closePath();
+  ctx.fill();
+
+  // リップ（エッジ）
+  ctx.strokeStyle = 'rgba(30,70,110,.85)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - hwTop, yLip - lipH);
+  ctx.lineTo(cx + hwTop, yLip - lipH);
+  ctx.stroke();
+}
+
+/* フィニッシュライン */
+function drawFinishLine(cx, judgeY){
+  var y = judgeY - (G.finishD - G.playerD);
+  if (y < -20 || y > view.H + 20) return;
+  var hw = CONFIG.courseHalfWidth * persp(y);
+  var n = 12, w = (hw * 2) / n;
+  for (var i = 0; i < n; i++) {
+    ctx.fillStyle = (i % 2 === 0) ? CONFIG.finishLineColor : '#ffffff';
+    ctx.fillRect(cx - hw + i * w, y - 4, w, 8);
+  }
+  ctx.fillStyle = CONFIG.finishLineColor;
+  ctx.font = '700 11px ui-monospace,Consolas,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('FINISH', cx, y - 9);
+  ctx.textAlign = 'left';
+}
+
+function drawBand(judgeY, ratio, color){
+  var h = ratio * gapPx;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, judgeY - h, view.W, h * 2);
+}
+
+/* コブ1つ分の形。k=1 が判定対象のコブ、k<1 は判定しない「並びのコブ」 */
+/* コブの輪郭：下半分は楕円、上は稜線に向かって尖らせる（写真のコブは丸いドームではない） */
+function bumpPath(x, cy, RX, RY){
+  var pk = RY * CONFIG.mogulPeak;
+  ctx.beginPath();
+  ctx.moveTo(x - RX, cy);
+  ctx.bezierCurveTo(x - RX * 0.74, cy - pk * 0.62,
+                    x - RX * 0.34, cy - pk * 0.98,
+                    x - RX * 0.02, cy - pk);
+  ctx.bezierCurveTo(x + RX * 0.32, cy - pk * 0.96,
+                    x + RX * 0.76, cy - pk * 0.56,
+                    x + RX,        cy);
+  ctx.ellipse(x, cy, RX, RY, 0, 0, Math.PI);
+  ctx.closePath();
+}
+
+function drawBumpShape(x, y, sc, size, fade){
+  var rx = CONFIG.mogulRadiusX * sc * size;
+  var ry = CONFIG.mogulRadiusY * sc * size;
+
+  // コブは「地面に置かれた円盤」ではなく「雪面の隆起」。
+  // 接地点(y)より稜線を持ち上げ、周囲にくぼみを作ることで地形として見せる。
+  var lift = ry * CONFIG.mogulLift;
+  var cy   = y - lift;                 // 見えている盛り上がりの中心
+  var RX   = rx;
+  var RY    = ry + lift * 0.78;
+
+  // 1. 周囲のくぼみ（谷）。落ち影ではなく、雪面がへこんでいる表現
+  var tr = ctx.createRadialGradient(x, y + ry * 0.3, RX * 0.5, x, y + ry * 0.3, RX * CONFIG.mogulTrough);
+  tr.addColorStop(0,    'rgba(116,152,188,' + (0.30 * fade).toFixed(3) + ')');
+  tr.addColorStop(0.45, 'rgba(116,152,188,' + (0.17 * fade).toFixed(3) + ')');
+  tr.addColorStop(1,    'rgba(116,152,188,0)');
+  ctx.fillStyle = tr;
+  ctx.beginPath();
+  ctx.ellipse(x, y + ry * 0.3, RX * CONFIG.mogulTrough, RY * 1.0, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. 隆起本体。左上から光。縁は輪郭線ではなく色で落とす（線を引くと皿に見える）
+  var g = ctx.createRadialGradient(x - RX * 0.30, cy - RY * 0.52, RY * 0.10,
+                                   x,             cy,             RX * 1.04);
+  g.addColorStop(0,    '#ffffff');
+  g.addColorStop(0.40, '#f5fafe');
+  g.addColorStop(0.74, mixHex('#f2f7fc', '#dae7f2', fade));
+  g.addColorStop(1,    mixHex('#e7eff7', '#b4cce1', fade));
+  ctx.fillStyle = g;
+  bumpPath(x, cy, RX, RY);
+  ctx.fill();
+
+  // 3. 稜線に乗る光。硬い面にすると折り紙のように見えるので、ぼかした光にする
+  var pk = RY * CONFIG.mogulPeak;
+  var hy = cy - pk * 0.42;
+  var hg = ctx.createRadialGradient(x - RX * 0.12, hy - RY * 0.10, RY * 0.05,
+                                    x - RX * 0.06, hy,             RX * 0.58);
+  hg.addColorStop(0,   'rgba(255,255,255,' + (0.80 * (0.45 + 0.55 * fade)).toFixed(3) + ')');
+  hg.addColorStop(0.55,'rgba(255,255,255,' + (0.34 * (0.45 + 0.55 * fade)).toFixed(3) + ')');
+  hg.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = hg;
+  ctx.beginPath();
+  ctx.ellipse(x - RX * 0.06, hy, RX * 0.58, RY * 0.62, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4. 下端の照り返し（谷の雪から返る光）。これが無いと下側が沈んで皿に見える
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.beginPath();
+  ctx.ellipse(x, cy + RY * 0.76, RX * 0.64, RY * 0.11, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+}
+
+function drawMogul(m, cx, judgeY){
+  var y = judgeY - (m.d - G.playerD);
+  if (y < -60 || y > view.H + 60) return;
+  var sc = persp(y);
+  var x  = cx + m.side * CONFIG.mogulOffsetX * sc;
+  var RX = CONFIG.mogulRadiusX * sc;
+  var RY = CONFIG.mogulRadiusY * sc + CONFIG.mogulRadiusY * sc * CONFIG.mogulLift * 0.78;
+  var cy = y - CONFIG.mogulRadiusY * sc * CONFIG.mogulLift;
+
+  // 判定しない並びのコブ。実際のモーグルコースはコース幅いっぱいがコブなので、
+  // これが無いと「白い帯にコブが点々と置かれている」ようにしか見えない。
+  // 奇数列は半行ずらしてダイヤ状に並べる（実際のコースと同じ並び）。
+  // 隣の列（±mogulOffsetX）は、他の行の判定コブが既に埋めている。
+  // ここで足すのは、そのさらに外側の列（fieldPitch ごと）。結果としてダイヤ状に並ぶ。
+  for (var k = -CONFIG.fieldColumns; k <= CONFIG.fieldColumns; k++) {
+    if (k === 0) continue;
+    var wx = m.side * CONFIG.mogulOffsetX + k * CONFIG.fieldPitch;
+    if (Math.abs(wx) > CONFIG.fieldHalfWidth) continue;
+    drawBumpShape(cx + wx * sc, y, sc, CONFIG.decoScale, CONFIG.decoFade);
+  }
+
+  drawBumpShape(x, y, sc, 1, 1);
+
+  // 判定結果の残光
+  if (m.judged && m.result) {
+    var age = G.time - m.judgedAt;
+    var life = 0.5;
+    if (age < life) {
+      var a = 1 - age / life;
+      var col = { perfect:'15,138,95', good:'22,103,200', ok:'170,140,20',
+                  miss:'192,57,43', majorMiss:'142,27,16' }[m.result];
+      ctx.strokeStyle = 'rgba(' + col + ',' + (a * 0.9).toFixed(3) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(x, cy, RX * (1 + (1 - a) * 0.32), RY * (1 + (1 - a) * 0.32), 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+function drawPlayer(cx, judgeY){
+  var s = persp(judgeY);
+  var p = G.player;
+  var pop  = 1 + (p.pop / CONFIG.playerPopTime) * 0.14;
+  var comp = CONFIG.absorbEnabled ? p.comp * p.compQ * CONFIG.absorbDepth : 0;  // 吸収＝腰が沈む
+  var buck = p.buck * CONFIG.buckHeight;                                        // MISS＝突き上げ
+
+  // 横位置：脚は大きく振れ、腰は half、上体はほとんど動かない（モーグルの基本姿勢）
+  var swing  = p.x + p.sway;
+  var fixed  = CONFIG.upperBodyFixed;
+  var footX  = p.line + swing;
+  var hipX   = p.line + swing * (fixed ? CONFIG.hipFollow   : 1);
+  var torsoX = p.line + swing * (fixed ? CONFIG.torsoFollow : 1);
+
+  // --- AIR（§17.3）---
+  var air = activeAir(G.playerD), airH = 0, tkPose = 0;
+  if (air) {
+    if (air.stage === 'takeoff') {
+      var tk = clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1);
+      if (air.setResult && air.setResult !== 'none') {
+        // セット成立。伸び上がりはタップ起点の吸収サイクル（comp）が作るのでここでは足さない
+        tkPose = 0;
+      } else {
+        // セットできていない → 沈んだまま、振れた姿勢でリップを越える（§17.3.2）
+        tkPose = CONFIG.absorbDepth * Math.min(1, tk / 0.5);
+      }
+    } else if (air.stage === 'flight') {
+      airH = Math.sin(Math.PI * clamp(air.u, 0, 1)) * CONFIG.airMaxHeight;
+    }
+  }
+
+  var footY = 8;
+  var hipY  = -CONFIG.hipHeight + comp + tkPose - buck;   // 沈むと脚が畳まれ、負なら伸び上がる
+  var shoY  = hipY - 18;
+  var headY = shoY - 9;
+
+  ctx.save();
+  ctx.translate(cx, judgeY);
+  ctx.scale(s * pop, s * pop);
+
+  // 影（空中では小さく薄くなる。着地タイミングの手がかり）
+  var hR = CONFIG.airMaxHeight > 0 ? airH / CONFIG.airMaxHeight : 0;
+  var shSc = 1 - hR * 0.45;
+  ctx.fillStyle = 'rgba(90,120,150,' + (0.26 * (1 - hR * 0.45)).toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(footX, 20, 17 * shSc, 5 * shSc, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 空中の姿勢。影は地面に残したまま、選手だけ持ち上げて回す
+  ctx.save();
+  if (airH > 0.5) {
+    var spin = AIR_SPIN[air.trick] || AIR_SPIN['360'];
+    var open = air.openT;                              // タップ後、開いて上体を起こす
+    var flipA = air.rot * spin.flip * Math.PI * 2;
+    var flipT = Math.round(flipA / (Math.PI * 2)) * Math.PI * 2;   // 一番近い「回り切った」姿勢
+    var yawA  = air.rot * spin.yaw * Math.PI * 2;
+    var sx    = Math.cos(yawA);
+    if (Math.abs(sx) < 0.22) sx = sx < 0 ? -0.22 : 0.22;
+    ctx.translate(footX, footY - airH);
+    ctx.scale(1 + hR * 0.18, 1 + hR * 0.18);
+    ctx.rotate(spin.tilt * (1 - open) + flipA + (flipT - flipA) * open);
+    ctx.scale(sx + (1 - sx) * open, 1);
+    ctx.translate(-footX, -footY);
+  } else if (air && air.landLeanT > 0) {
+    // 着地姿勢：早い＝後傾／遅い＝前傾（§17.4）
+    var lt = air.landLeanT / CONFIG.airLandLeanTime;
+    ctx.translate(footX, footY);
+    ctx.rotate(-air.landLean * 0.38 * lt);
+    ctx.translate(-footX, -footY);
+  }
+
+  // 転倒（§15）。足元を軸に外側へ倒れる。影は回さないのでここから内側だけ
+  ctx.save();
+  if (G.fallAnim > 0.001) {
+    var fdir = G.fallDir;      // 転倒開始時に固定した向き（§13.1(4)）
+    ctx.translate(footX, footY);
+    ctx.rotate(G.fallAnim * CONFIG.fallLeanAngle * fdir);
+    ctx.translate(-footX, -footY);
+  }
+
+  // スキー（ターン方向へエッジング）
+  ctx.save();
+  ctx.translate(footX, footY);
+  ctx.rotate(p.lean * CONFIG.edgeAngle);
+  ctx.fillStyle = '#12304d';
+  roundRect(-11.5, -14, 6.5, 30, 3); ctx.fill();
+  roundRect(5, -14, 6.5, 30, 3);     ctx.fill();
+  ctx.restore();
+
+  // 脚（腰→膝→ブーツ）。吸収すると膝が外へ開いて持ち上がる＝畳んでいるのが見える
+  var kneeT = 0.52;
+  var kneeLift = Math.max(0, p.comp) * (CONFIG.absorbEnabled ? 1 : 0);
+  ctx.strokeStyle = '#12304d';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 6.5;
+  for (var li = -1; li <= 1; li += 2) {
+    var hx = hipX + li * 4,   hy = hipY;
+    var bx = footX + li * 5.5, by = footY - 2;
+    var kx = hx + (bx - hx) * kneeT + li * kneeLift * CONFIG.kneeOut;
+    var ky = hy + (by - hy) * kneeT - kneeLift * CONFIG.kneeUp;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(kx, ky);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+  }
+
+  // 上体（フォールラインを向いたまま）
+  ctx.fillStyle = '#e8402f';
+  ctx.beginPath();
+  ctx.moveTo(torsoX - 9.5, shoY);
+  ctx.lineTo(torsoX + 9.5, shoY);
+  ctx.lineTo(hipX + 7.5, hipY + 1);
+  ctx.lineTo(hipX - 7.5, hipY + 1);
+  ctx.closePath();
+  ctx.fill();
+
+  // 腕・ストック（前に構える）
+  ctx.strokeStyle = '#0d1b2a';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(torsoX - 9, shoY + 3); ctx.lineTo(torsoX - 20, shoY + 15);
+  ctx.moveTo(torsoX + 9, shoY + 3); ctx.lineTo(torsoX + 20, shoY + 15);
+  ctx.stroke();
+
+  // 頭
+  ctx.fillStyle = '#12304d';
+  ctx.beginPath();
+  ctx.arc(torsoX, headY, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();   // 転倒の回転
+  ctx.restore();   // 空中／着地姿勢
+  ctx.restore();
+}
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* =========================================================================
+   HUD（DOM。§22.4）
+   ========================================================================= */
+function updateHud(){
+  elElapsed.textContent = G.runTime.toFixed(2);     // 計測タイム。フィニッシュで止まる（§19.2）
+  elSpeedV.textContent  = G.speed.toFixed(3);
+  elSpeedB.style.width  =
+    (clamp((G.speed - CONFIG.minSpeed) / (CONFIG.maxSpeed - CONFIG.minSpeed), 0, 1) * 100).toFixed(1) + '%';
+
+  for (var key in elCount) elCount[key].textContent = G.counts[key];
+
+  // BALANCE（§14）／ COMBO（§16）
+  var balRatio = clamp(G.balance / CONFIG.startBalance, 0, 1);
+  elBalV.textContent = Math.round(G.balance);
+  elBalB.style.width = (balRatio * 100).toFixed(1) + '%';
+  elBalB.style.backgroundColor = balRatio > 0.6 ? '#2fa36b' : (balRatio > 0.3 ? '#d69a1e' : '#c0392b');
+  elFallTag.classList.toggle('on', G.fallTimer > 0);
+  elCombo.textContent = G.combo;
+  elCombo.classList.toggle('on', G.combo > 0);
+
+  // --- カウントダウン（§19.2）---
+  if (G.phase === 'countdown') {
+    elCountdn.textContent = G.countdown > 1 ? String(Math.ceil(G.countdown)) : 'GO!';
+    elCountdn.classList.remove('hidden');
+  } else {
+    elCountdn.classList.add('hidden');
+  }
+
+  // --- 進行バー・残りコブ数（§19.2 現在地が分かること）---
+  var remain = 0;
+  for (var mi = 0; mi < G.moguls.length; mi++) if (!G.moguls[mi].judged) remain++;
+  var air = currentAirZone(G.playerD);
+  elProgL.classList.toggle('air', !!air);
+  if (air) {
+    var za = airOfZone(air.index);
+    var st = za ? AIR_STAGE_LABEL[za.stage] : null;
+    elProgL.innerHTML = '▲ AIR ' + air.index + (st ? '　' + st : '（コブなし）');
+  } else {
+    elProgL.innerHTML = '残り <b id="progLeftV">' + remain + '</b> コブ';
+  }
+
+  // エア進入の表示（§17.3 APPROACH）。技と DD を出すだけ。操作ボタンは出さない
+  var a = activeAir(G.playerD);
+  var showAir = !!a && (a.stage === 'approach' || a.stage === 'takeoff');
+  if (showAir) {
+    document.getElementById('airInfoNo').textContent    = 'AIR ' + a.index;
+    document.getElementById('airInfoTrick').textContent = a.label;
+    document.getElementById('airInfoDd').textContent    = 'DD ' + a.dd.toFixed(2);
+  }
+  elAirInfoMain.classList.toggle('on', showAir);
+
+  // セット判定（§17.3.2）。小さく出し、着地判定が出るまで残す
+  var showSet = !!a && a.setDone && a.result === null;
+  if (showSet && elSetInfo.textContent !== SET_LABEL[a.setResult]) {
+    elSetInfo.textContent = SET_LABEL[a.setResult];
+    elSetInfo.className = 's-' + a.setResult;
+  }
+  elSetInfo.classList.toggle('on', showSet);
+  // 進捗は % で出す。m 表示にすると、§19.2 のコース長（構成上の 234 m）と
+  // 実走行距離（助走 + コース + ラン. アウト）が食い違って読み手が混乱するため
+  var prog = clamp(G.playerD / G.finishD, 0, 1);
+  elProgBar.style.width = (prog * 100).toFixed(2) + '%';
+  elProgR.textContent = (prog * 100).toFixed(0) + '%';
+
+  // デバッグ表示（§19）
+  var gapSec = gapPx / (CONFIG.baseScroll * G.speed);      // 現在速度でのコブ間隔（秒）
+  var tps    = 1 / gapSec;
+  var w = function(r){ return '±' + (r * gapSec).toFixed(3) + 's'; };
+
+  // Active Target の状況
+  var seg = CONFIG.targetSegment * gapPx;
+  var target = null, nextUn = null;
+  for (var i = 0; i < G.moguls.length; i++) {
+    if (!G.moguls[i].judged) { nextUn = G.moguls[i]; break; }
+  }
+  if (nextUn && Math.abs(nextUn.d - G.playerD) <= seg) target = nextUn;
+  var tgtTxt = target
+    ? (target.side === SIDE_LEFT ? 'L' : 'R') + ' ' +
+      ((target.d - G.playerD) / gapPx >= 0 ? '+' : '') + ((target.d - G.playerD) / gapPx).toFixed(3)
+    : (nextUn ? '— (次 ' + ((nextUn.d - G.playerD) / gapPx).toFixed(2) + ' 区間外)' : '—');
+
+  var localGap    = nextUn ? nextUn.gapFromPrev : gapPx;
+  var localGapSec = localGap / (CONFIG.baseScroll * G.speed);
+
+  if (!showDebug) { if (invariantIssues.length) elDebug.classList.remove('hidden'); else return; }
+
+  var html =
+    '<span class="t">gap</span> <em>' + gapPx.toFixed(0) + 'px</em>' +
+    ' <span class="t">間隔</span> <em>' + gapSec.toFixed(3) + 's</em>' +
+    ' <span class="t">秒間</span> <em>' + tps.toFixed(2) + '</em>' +
+    ' <span class="t">実間隔</span> ' + localGap.toFixed(0) + 'px/' + localGapSec.toFixed(3) + 's<br>' +
+    '<span class="t">窓</span> P' + w(CONFIG.perfectWindow) +
+    ' G' + w(CONFIG.goodWindow) +
+    ' O' + w(CONFIG.okWindow) +
+    ' SEG' + w(CONFIG.targetSegment) + '<br>' +
+    '<span class="t">TARGET</span> ' + tgtTxt +
+    ' <span class="t">seed</span> ' + CONFIG.courseSeed +
+    ' <span class="t">難度</span> <em>' + (DIFF_LABEL[G.difficulty] || G.difficulty) + '</em>' +
+    ' <span class="t">コブ</span> ' + G.sectionCounts.join('/') + '=' + G.moguls.length +
+    ' <span class="t">幅</span> ' +
+      (CONFIG.courseHalfWidth * 2 / CONFIG.pxPerMeterX).toFixed(1) + 'm<br>' +
+    '<span class="t">BAL</span> <em>' + G.balance.toFixed(0) + '</em>' +
+    ' <span class="t">COMBO</span> ' + G.combo +
+    ' <span class="t">FALL</span> <em>' + G.falls + '</em>' +
+    ' <span class="t">揺れ</span> ' + (G.player.disturb * CONFIG.lineDriftMax).toFixed(1) + 'px' +
+    ' <span class="t">加速率</span> ' +
+      (CONFIG.balanceAffectsGain
+        ? (CONFIG.balanceGainFloor + (1 - CONFIG.balanceGainFloor) *
+           clamp(G.balance / CONFIG.startBalance, 0, 1)).toFixed(2)
+        : '1.00') +
+    ' <span class="t">つなぎ目</span> ' + absorbLinkSum().toFixed(1) + '/' + (G.moguls.length - 1) +
+    ' <span class="t">PHASE</span> ' + G.phase +
+    G.airs.map(function(x){
+      return ' <span class="t">A' + x.index + '</span> ' + x.label + '/DD' + x.dd.toFixed(2) +
+        (x.stage !== 'none' && x.stage !== 'done' ? ' ' + x.stage : '') +
+        (x.setResult ? ' <em>' + x.setResult + '</em>' +
+           (x.setDeltaM === null ? '' :
+            '(' + (x.setDeltaM >= 0 ? '+' : '') + x.setDeltaM.toFixed(2) + 'm)') : '') +
+        (x.result ? ' <em>' + x.result + '</em>Q' + x.quality.toFixed(1) +
+                    'V' + x.value.toFixed(2) : '');
+    }).join('') +
+    (G.airCourseIssue ? '<br><span class="t">§17.3.2(3) 情報: </span>' + G.airCourseIssue : '');
+
+  if (invariantIssues.length) {
+    html += '<br><span class="warn">§22.1 違反: ' + invariantIssues.join(' / ') + '</span>';
+  }
+  elDebug.innerHTML = html;
+}
+
+/* =========================================================================
+   サイズ調整
+   ========================================================================= */
+function resize(){
+  var rect = stage.getBoundingClientRect();
+  // 非表示 iframe など、レイアウト前に呼ばれても NaN にしない
+  view.cssW = rect.width  > 1 ? rect.width  : CONFIG.logicalWidth;
+  view.cssH = rect.height > 1 ? rect.height : CONFIG.logicalWidth * 16 / 9;
+  view.dpr  = Math.min(window.devicePixelRatio || 1, CONFIG.maxDpr);
+  canvas.width  = Math.max(1, Math.round(view.cssW * view.dpr));
+  canvas.height = Math.max(1, Math.round(view.cssH * view.dpr));
+  canvas.style.width  = view.cssW + 'px';
+  canvas.style.height = view.cssH + 'px';
+  view.scale  = view.cssW / CONFIG.logicalWidth;
+  view.W      = CONFIG.logicalWidth;
+  view.H      = view.cssH / view.scale;
+  view.judgeY = view.H * CONFIG.judgeLineY;
+  stage.classList.toggle('narrow', view.cssW < CONFIG.narrowWidth);
+  stage.classList.toggle('shortres', view.cssH < CONFIG.shortResultHeight);
+  layoutJudgeText();
+}
+
+/* 判定表示は TURN JUDGE LINE の下（＝通過済みの領域）に置き、来るコブを隠さない。
+   ただし画面下部（進行バー＋デバッグ＋操作バー）に重ねない（§19.1）。
+   デバッグの行数で下部の高さが変わるので、切り替え時にも呼び直す */
+function layoutJudgeText(){
+  var bottomH = elBottom.getBoundingClientRect().height;
+  var judgeH  = elJudge.getBoundingClientRect().height || CONFIG.judgeTextHeight;
+  var wanted  = view.cssH * CONFIG.judgeLineY + CONFIG.judgeTextOffset;
+  var limit   = view.cssH - bottomH - judgeH - CONFIG.judgeTextGap;
+  // 端数を切り上げると 1px 重なるので floor で寄せる
+  elJudge.style.top = Math.floor(Math.max(0, Math.min(wanted, limit))) + 'px';
+}
+function onResize(){ resize(); }
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', function(){ setTimeout(onResize, 120); });
+if (window.ResizeObserver) {
+  new ResizeObserver(onResize).observe(stage);
+  // デバッグ表示の行数で下部の高さが変わるので、変わったら判定表示を置き直す
+  new ResizeObserver(layoutJudgeText).observe(elBottom);
+}
+
+/* =========================================================================
+   メインループ
+   ========================================================================= */
+function frame(now){
+  update(now);
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+resetGame();
+showStartOverlay();          // 初回はスタート画面から（§19.2）
+G.lastMs = performance.now();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
