@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>MOGUL CHALLENGE — Playable Run (STEP 3)</title>
+<title>MOGUL CHALLENGE</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{
@@ -140,6 +140,10 @@
     letter-spacing:.18em;font-size:13px;padding:12px 34px;border-radius:999px;cursor:pointer;
     font-family:inherit;margin-top:16px;}
   .bigbtn:active{background:#1a7fd8;}
+  /* HOME はスタート画面に戻る副ボタン。RETRY より弱い見た目にする（§19.3） */
+  .bigbtn.ghost{background:transparent;border:1px solid rgba(143,180,212,.55);color:#b9d2e6;}
+  .bigbtn.ghost:active{background:rgba(143,180,212,.18);}
+  #resBtnRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
 
   /* カウントダウンはコースを隠さない（背景なし） */
   #countdown{position:absolute;left:0;right:0;top:38%;z-index:4;text-align:center;
@@ -265,6 +269,7 @@
         <button id="btnWindows" type="button">窓 OFF</button>
         <button id="btnDebug" type="button">DEBUG ON</button>
         <button id="btnRestart" type="button">RESTART</button>
+        <button id="btnHome" type="button">HOME</button>
       </span>
     </div>
   </div>
@@ -337,7 +342,10 @@
         <div class="resSmall" id="resExtra"></div>
       </div>
 
-      <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
+      <div id="resBtnRow">
+        <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
+        <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
+      </div>
       <div class="resNote">TURN 60 ＋ AIR 20 ＋ TIME 20 ＝ 100（現在の技での最大は 97.6）</div>
     </div>
   </div>
@@ -1463,6 +1471,17 @@ window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 document.getElementById('btnRestart').addEventListener('click', function(){ resetGame(); startCountdown(); });
 document.getElementById('btnRetry').addEventListener('click',   function(){ resetGame(); startCountdown(); });
 document.getElementById('btnStart').addEventListener('click',   function(){ startCountdown(); });
+/* HOME（§19.3）— 滑走中でもリザルト表示中でも、確認なしでスタート画面へ戻す。
+   このランは破棄する（記録は残さない）。押しっぱなしのキー／指の状態も必ず捨てる。 */
+function goHome(){
+  heldDirs.clear();
+  pointerDirs.clear();
+  resetGame();          // G を作り直す（phase は 'ready' に戻る）
+  showStartOverlay();
+}
+window.goHome = goHome;
+document.getElementById('btnHome').addEventListener('click',    goHome);
+document.getElementById('btnResHome').addEventListener('click', goHome);
 // 難易度切替（§7.4）。選び直したらコースを作り直す（本数・区間境界・CL は変わらない）
 (function(){
   var btns = document.querySelectorAll('.diffbtn');
