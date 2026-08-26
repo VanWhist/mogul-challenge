@@ -103,6 +103,7 @@
   /* 難易度選択（§7.4 / §19.2） */
   .diffLbl{font-size:9px;letter-spacing:.18em;color:#8fb4d4;margin-bottom:6px;}
   #diffRow{display:flex;gap:6px;margin-bottom:7px;}
+  .diffbtn,.trickbtn{min-height:44px;}
   .diffbtn{appearance:none;border:1px solid rgba(143,180,212,.45);background:transparent;
     color:#b9d2e6;font-size:11px;font-weight:700;letter-spacing:.10em;padding:8px 14px;
     border-radius:999px;cursor:pointer;font-family:inherit;}
@@ -138,12 +139,26 @@
   .ovSub{font-size:10px;letter-spacing:.14em;color:#8fb4d4;margin-bottom:16px;}
   .bigbtn{appearance:none;border:0;background:#2f9bff;color:#fff;font-weight:900;
     letter-spacing:.18em;font-size:13px;padding:12px 34px;border-radius:999px;cursor:pointer;
-    font-family:inherit;margin-top:16px;}
+    font-family:inherit;margin-top:16px;min-height:44px;}
   .bigbtn:active{background:#1a7fd8;}
   /* HOME はスタート画面に戻る副ボタン。RETRY より弱い見た目にする（§19.3） */
   .bigbtn.ghost{background:transparent;border:1px solid rgba(143,180,212,.55);color:#b9d2e6;}
   .bigbtn.ghost:active{background:rgba(143,180,212,.18);}
-  #resBtnRow,#startBtnRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  #resBtnRow,#startBtnRow,#startSubRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  /* START は主操作なので単独の行。RANKING / HELP は 1 段下げて小さく（§19.5） */
+  .bigbtn.sm{font-size:11px;padding:9px 20px;margin-top:9px;letter-spacing:.14em;}
+  /* 構成ごとの上限（§18.5）。ハードコードせず CONFIG から計算した値を入れる */
+  #ovMax{font-size:10px;letter-spacing:.08em;color:#7fe0b0;margin-top:5px;}
+  /* あそびかた（§19.5） */
+  #helpCard{width:100%;max-width:320px;text-align:left;}
+  #helpCard .ovTitle,#helpCard .ovSub{text-align:center;}
+  .helpSec{margin-top:13px;border-top:1px solid rgba(143,180,212,.28);padding-top:8px;}
+  .helpH{font-size:10px;letter-spacing:.16em;color:#7fb2dd;margin-bottom:4px;}
+  .helpP{font-size:11.5px;line-height:1.75;color:#dbe9f6;}
+  .helpP em{font-style:normal;color:#7fe0b0;font-weight:700;}
+  #helpCard .bigbtn{display:block;margin-left:auto;margin-right:auto;}
+  #stage.shortres .helpSec{margin-top:9px;padding-top:6px;}
+  #stage.shortres .helpP{line-height:1.6;}
   /* --- 自己ランキング（§19.4）--- */
   #rankCard{width:100%;max-width:320px;}
   .rankRow{display:flex;align-items:baseline;gap:8px;font-size:11px;line-height:1.95;
@@ -189,7 +204,7 @@
   #stage.shortres .resSec{margin-top:9px;padding-top:6px;}
   #stage.shortres .resSecTitle{margin-top:7px;}
   #stage.shortres .resSmall{line-height:1.55;}
-  #stage.shortres .bigbtn{padding:9px 30px;margin-top:10px;}
+  #stage.shortres .bigbtn{padding:9px 30px;margin-top:10px;}   /* 高さは min-height 44px を割らない */
   #stage.shortres .ovSub{margin-bottom:8px;}
   #stage.shortres .resNote{margin-top:6px;}
   #stage.shortres #resPb{margin-top:3px;font-size:10px;}
@@ -206,7 +221,9 @@
   /* 狭い画面ではヒントを縮めてボタンを守る（§19.1 はみ出し禁止） */
   #hint{font-size:9px;letter-spacing:.06em;color:#5b7186;white-space:nowrap;
     flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
-  #btnrow{display:flex;gap:5px;flex:0 0 auto;}
+  #btnrow{display:flex;gap:6px;flex:0 0 auto;}
+  /* 指で押すボタンは 44px 以上（§19.1）。デバッグ用を隠したぶんの余白をここに回す */
+  #btnrow button{min-height:44px;padding:0 14px;}
   button{appearance:none;border:1px solid rgba(13,27,42,.18);background:rgba(255,255,255,.9);
     color:#0d1b2a;font-size:9px;font-weight:700;letter-spacing:.08em;padding:6px 9px;
     border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
@@ -319,11 +336,47 @@
     <div class="resRow"><span class="rk">COURSE</span><span class="rv" id="ovCourse">253 m</span></div>
     <div class="resRow"><span class="rk">TURNS</span><span class="rv" id="ovTurns">56</span></div>
     <div class="resRow"><span class="rk">AIR</span><span class="rv" id="ovAir">20 m × 2</span></div>
+    <div id="ovMax"></div>
     <div id="startBtnRow">
       <button class="bigbtn" id="btnStart" type="button">START</button>
-      <button class="bigbtn ghost" id="btnRank" type="button">RANKING</button>
+    </div>
+    <div id="startSubRow">
+      <button class="bigbtn ghost sm" id="btnRank" type="button">RANKING</button>
+      <button class="bigbtn ghost sm" id="btnHelp" type="button">HELP</button>
     </div>
     <div class="resNote">← / A ・ → / D ／ 画面左右タップ</div>
+  </div>
+
+  <div class="overlay hidden" id="helpOverlay">
+    <div id="helpCard">
+      <div class="ovTitle">あそびかた</div>
+      <div class="ovSub">MOGUL CHALLENGE</div>
+
+      <div class="helpSec">
+        <div class="helpH">ターン</div>
+        <div class="helpP">コブが<em>判定ライン（点線）に重なった瞬間</em>に、画面の左右を交互にタップ。
+        早くても遅くても点が下がる。連打しても点にはならない。</div>
+      </div>
+
+      <div class="helpSec">
+        <div class="helpH">エア</div>
+        <div class="helpP">エア台の手前で<em>1回タップして構えを作る</em>（セット）。
+        <span id="helpSetM"></span>空中で<em>もう1回タップして着地を合わせる</em>。</div>
+      </div>
+
+      <div class="helpSec">
+        <div class="helpH">バランス</div>
+        <div class="helpP">ターンを外すと BALANCE が減り、尽きると転ぶ。転ぶと立て直すまで数ターンかかる。</div>
+      </div>
+
+      <div class="helpSec">
+        <div class="helpH">採点</div>
+        <div class="helpP" id="helpScore"></div>
+      </div>
+
+      <button class="bigbtn" id="btnHelpClose" type="button">CLOSE</button>
+      <div class="resNote" style="text-align:center">スタート画面の HELP でいつでも読めます</div>
+    </div>
   </div>
 
   <div class="overlay hidden" id="rankOverlay">
@@ -405,6 +458,7 @@ var CONFIG = {
   recordStoreKey:   'mogulChallenge.records.v1',  // localStorage のキー。形が変わったら v2 にする
   recordKeepRuns:   10,     // 難易度ごとに残す「直近のラン」の件数
   recordKeepBest:    3,     // 難易度ごとに残す「自己ベスト」の件数（古くなっても消さない）
+  helpSeenKey:      'mogulChallenge.seenHelp.v1',  // あそびかたを見たかどうか（§19.5）
   mogulOffsetX:     56,     // センターからのコブの左右オフセット(px)
   judgeLineY:       0.72,   // TURN JUDGE LINE の縦位置（画面高さに対する比率）
 
@@ -756,6 +810,7 @@ var elFallTag = document.getElementById('fallTag');
 var elStartOv = document.getElementById('startOverlay');
 var elResultOv= document.getElementById('resultOverlay');
 var elRankOv  = document.getElementById('rankOverlay');
+var elHelpOv  = document.getElementById('helpOverlay');
 var elCountdn = document.getElementById('countdown');
 var elProgL   = document.getElementById('progLeft');
 var elProgR   = document.getElementById('progRight');
@@ -764,7 +819,10 @@ var elProgOut = document.getElementById('progBarOuter');
 var elBottom  = document.getElementById('bottom');
 var elAirInfoMain = document.getElementById('airInfoMain');
 var elSetInfo     = document.getElementById('setInfo');
-var showDebug = true;
+// ★デバッグ表示は既定オフ（§19.6）。URL に ?debug=1 を付けたときだけ従来どおり出す。
+//   検証するときは必ず ?debug=1 を付けること
+var debugMode = /(^|[?&])debug=1(&|$)/.test(location.search);
+var showDebug = debugMode;
 var elCount = {
   perfect:   document.getElementById('cPerfect'),
   good:      document.getElementById('cGood'),
@@ -1525,6 +1583,11 @@ function goHome(){
 }
 window.goHome = goHome;
 document.getElementById('btnRank').addEventListener('click',      showRanking);
+document.getElementById('btnHelp').addEventListener('click',      showHelp);
+document.getElementById('btnHelpClose').addEventListener('click', function(){
+  markHelpSeen();                  // 初回に読んだら次からは自動で出さない（§19.5）
+  showStartOverlay();
+});
 document.getElementById('btnRankClose').addEventListener('click', showStartOverlay);
 document.getElementById('btnHome').addEventListener('click',    goHome);
 document.getElementById('btnResHome').addEventListener('click', goHome);
@@ -1577,6 +1640,7 @@ function hideOverlays(){
   elStartOv.classList.add('hidden');
   elResultOv.classList.add('hidden');
   elRankOv.classList.add('hidden');
+  elHelpOv.classList.add('hidden');
   elCountdn.classList.add('hidden');
 }
 
@@ -1764,6 +1828,58 @@ window.showRanking  = showRanking;
 window.recordsLoad  = recordsLoad;
 window.recordsPush  = recordsPush;
 
+/* =========================================================================
+   構成ごとの上限（§18.5）と あそびかた（§19.5）
+   ========================================================================= */
+
+/* いま選んでいる技の組み合わせで理論上いくつまで出るか。
+   ★数値をハードコードしない。CONFIG から毎回計算する（§22.3）。
+   TURN 満点 ＋ AIR（Quality 上限 × DD、リピートは片方だけ）＋ TIME 満点。 */
+function currentMaxScore(){
+  var qMax = CONFIG.airQualityBands.perfect[1];         // Quality の上限（10.0）
+  var dd1  = (CONFIG.airTricks[CONFIG.selectedAir1] || {}).dd || 0;
+  var dd2  = (CONFIG.airTricks[CONFIG.selectedAir2] || {}).dd || 0;
+  var repeat = !CONFIG.airRepeatCounts && CONFIG.selectedAir1 === CONFIG.selectedAir2;
+  var ddSum  = repeat ? dd1 : dd1 + dd2;               // リピートは 2 本目がカウントされない（§18.3）
+  var air    = clamp(ddSum * qMax, 0, CONFIG.airScoreMax);
+  return {
+    turn: CONFIG.turnScoreMax,
+    air:  air,
+    time: CONFIG.timeScoreMax,
+    total: CONFIG.turnScoreMax + air + CONFIG.timeScoreMax,
+    repeat: repeat
+  };
+}
+window.currentMaxScore = currentMaxScore;
+
+function showHelp(){
+  // 距離はここでも CONFIG から出す（§17.3.2 の理想位置を変えたら文章も追従する）
+  document.getElementById('helpSetM').textContent =
+    'リップとの距離を目で測って合わせるのがコツ。目安は ' +
+    CONFIG.airSetIdealM + ' m くらい手前。';
+  var m = currentMaxScore();
+  document.getElementById('helpScore').textContent =
+    'TURN ' + CONFIG.turnScoreMax + ' ＋ AIR ' + CONFIG.airScoreMax +
+    ' ＋ TIME ' + CONFIG.timeScoreMax + ' ＝ ' + CONFIG.totalScoreMax + ' 点。' +
+    (CONFIG.airRepeatCounts ? '' : 'AIR は同じ技を 2 本跳ぶと 2 本目がカウントされない（FIS と同じ）。') +
+    'タイムはコース長から決まるペースタイムとの比で点になる。';
+  elStartOv.classList.add('hidden');
+  elResultOv.classList.add('hidden');
+  elRankOv.classList.add('hidden');
+  elHelpOv.classList.remove('hidden');
+}
+window.showHelp = showHelp;
+
+function helpSeen(){
+  if (!recordsAvailable) return false;     // 保存できない端末では毎回出す（出ないより良い）
+  try { return window.localStorage.getItem(CONFIG.helpSeenKey) === '1'; }
+  catch (e) { return false; }
+}
+function markHelpSeen(){
+  if (!recordsAvailable) return;
+  try { window.localStorage.setItem(CONFIG.helpSeenKey, '1'); } catch (e) { /* 無視 */ }
+}
+
 function showStartOverlay(){
   document.getElementById('ovCourse').textContent = courseMeters().toFixed(0) + ' m';
   document.getElementById('ovTurns').textContent  = G.moguls.length;   // 生成された本数（§19.2）
@@ -1783,6 +1899,10 @@ function showStartOverlay(){
   document.getElementById('trickNote').textContent =
     'AIR 1 ' + t1.label + ' (DD ' + t1.dd.toFixed(2) + ')　/　AIR 2 ' +
     t2.label + ' (DD ' + t2.dd.toFixed(2) + ')';
+  // この構成で狙える上限（§18.5）。難しい技を選ぶ理由が滑る前に分かるようにする
+  var mx = currentMaxScore();
+  document.getElementById('ovMax').textContent =
+    'この構成の上限 ' + mx.total.toFixed(1) + ' / ' + CONFIG.totalScoreMax;
   // 同じ技を選んでいる間は警告を出す（§18.3）。選択そのものは禁止しない
   document.getElementById('repeatWarn').textContent =
     (!CONFIG.airRepeatCounts && CONFIG.selectedAir1 === CONFIG.selectedAir2)
@@ -1793,6 +1913,7 @@ function showStartOverlay(){
   }
   elResultOv.classList.add('hidden');
   elRankOv.classList.add('hidden');
+  elHelpOv.classList.add('hidden');
   elStartOv.classList.remove('hidden');
 }
 
@@ -2750,8 +2871,17 @@ function frame(now){
 }
 
 resize();
+// デバッグ用の表示とボタンは ?debug=1 のときだけ（§19.6）
+elDebug.classList.toggle('hidden', !showDebug);
+if (!debugMode) {
+  document.getElementById('btnWindows').style.display = 'none';
+  document.getElementById('btnDebug').style.display   = 'none';
+}
+
 resetGame();
-showStartOverlay();          // 初回はスタート画面から（§19.2）
+// 初めて開いた人にはあそびかたを先に出す（§19.5）。2 回目からはスタート画面から
+if (helpSeen()) showStartOverlay();
+else            showHelp();
 G.lastMs = performance.now();
 requestAnimationFrame(frame);
 </script>
