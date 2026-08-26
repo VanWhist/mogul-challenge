@@ -143,7 +143,23 @@
   /* HOME はスタート画面に戻る副ボタン。RETRY より弱い見た目にする（§19.3） */
   .bigbtn.ghost{background:transparent;border:1px solid rgba(143,180,212,.55);color:#b9d2e6;}
   .bigbtn.ghost:active{background:rgba(143,180,212,.18);}
-  #resBtnRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  #resBtnRow,#startBtnRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  /* --- 自己ランキング（§19.4）--- */
+  #rankCard{width:100%;max-width:320px;}
+  .rankRow{display:flex;align-items:baseline;gap:8px;font-size:11px;line-height:1.95;
+    font-variant-numeric:tabular-nums;}
+  .rankRow .rn{color:#7fb2dd;width:20px;flex:0 0 auto;text-align:right;}
+  .rankRow .rd{color:#8fb4d4;width:74px;flex:0 0 auto;text-align:left;font-size:10px;}
+  .rankRow .rs{font-weight:900;width:52px;flex:0 0 auto;text-align:right;}
+  .rankRow .rx{color:#8fb4d4;font-size:10px;flex:1 1 auto;text-align:right;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rankRow.top .rs{color:#7fe0b0;}
+  .rankRow.me  {background:rgba(47,155,255,.14);border-radius:6px;}
+  #rankEmpty{font-size:11px;color:#8fb4d4;line-height:1.9;margin-top:14px;}
+  /* リザルトの自己ベスト表示（§19.4）。空なら行ごと消してリザルトの高さを増やさない */
+  #resPb{font-size:11px;font-weight:700;color:#7fe0b0;letter-spacing:.06em;margin-top:6px;}
+  #resPb:empty{display:none;}
+  #resPb.sub{color:#8fb4d4;font-weight:400;}
 
   /* カウントダウンはコースを隠さない（背景なし） */
   #countdown{position:absolute;left:0;right:0;top:38%;z-index:4;text-align:center;
@@ -176,6 +192,8 @@
   #stage.shortres .bigbtn{padding:9px 30px;margin-top:10px;}
   #stage.shortres .ovSub{margin-bottom:8px;}
   #stage.shortres .resNote{margin-top:6px;}
+  #stage.shortres #resPb{margin-top:3px;font-size:10px;}
+  #stage.shortres .rankRow{line-height:1.7;}
   #resRepeat{color:#e0a33a;}
   #resRepeat:empty{display:none;}
 
@@ -301,8 +319,25 @@
     <div class="resRow"><span class="rk">COURSE</span><span class="rv" id="ovCourse">253 m</span></div>
     <div class="resRow"><span class="rk">TURNS</span><span class="rv" id="ovTurns">56</span></div>
     <div class="resRow"><span class="rk">AIR</span><span class="rv" id="ovAir">20 m × 2</span></div>
-    <button class="bigbtn" id="btnStart" type="button">START</button>
+    <div id="startBtnRow">
+      <button class="bigbtn" id="btnStart" type="button">START</button>
+      <button class="bigbtn ghost" id="btnRank" type="button">RANKING</button>
+    </div>
     <div class="resNote">← / A ・ → / D ／ 画面左右タップ</div>
+  </div>
+
+  <div class="overlay hidden" id="rankOverlay">
+    <div id="rankCard">
+      <div class="ovTitle">RANKING</div>
+      <div class="ovSub" id="rankDiff">上級</div>
+      <div class="resSecTitle">自己ベスト</div>
+      <div class="resSec" id="rankBest"></div>
+      <div class="resSecTitle">直近のラン</div>
+      <div class="resSec" id="rankRecent"></div>
+      <div id="rankEmpty"></div>
+      <button class="bigbtn" id="btnRankClose" type="button">CLOSE</button>
+      <div class="resNote" id="rankNote"></div>
+    </div>
   </div>
 
   <div class="overlay hidden" id="resultOverlay">
@@ -311,6 +346,7 @@
       <div class="ovSub" id="resDiff">上級</div>
       <div class="resTime">TOTAL SCORE</div>
       <div><span class="resScoreV" id="resTotal">0.00</span><span class="resScoreMax"> / <span id="resTotalMax">100</span></span></div>
+      <div id="resPb"></div>
       <div class="resSec">
         <div class="resRow"><span class="rk">TURN</span><span class="rv" id="resScore">0.0</span><span class="rp">/ 60</span></div>
         <div class="resRow"><span class="rk">AIR</span><span class="rv" id="resAirScore">0.0</span><span class="rp">/ 20</span></div>
@@ -365,6 +401,10 @@ var CONFIG = {
   baseScroll:       210,    // speed=1.0 のスクロール速度（px/秒）
   gapJitter:        0.10,   // コブ間隔の揺らぎ（±比率）
   courseSeed:       12345,  // コース生成の乱数シード。同じ値なら同じコブ配置
+  // --- 自己ランキング（§19.4）---
+  recordStoreKey:   'mogulChallenge.records.v1',  // localStorage のキー。形が変わったら v2 にする
+  recordKeepRuns:   10,     // 難易度ごとに残す「直近のラン」の件数
+  recordKeepBest:    3,     // 難易度ごとに残す「自己ベスト」の件数（古くなっても消さない）
   mogulOffsetX:     56,     // センターからのコブの左右オフセット(px)
   judgeLineY:       0.72,   // TURN JUDGE LINE の縦位置（画面高さに対する比率）
 
@@ -715,6 +755,7 @@ var elFallTag = document.getElementById('fallTag');
 // STEP 3
 var elStartOv = document.getElementById('startOverlay');
 var elResultOv= document.getElementById('resultOverlay');
+var elRankOv  = document.getElementById('rankOverlay');
 var elCountdn = document.getElementById('countdown');
 var elProgL   = document.getElementById('progLeft');
 var elProgR   = document.getElementById('progRight');
@@ -1306,6 +1347,9 @@ function finishRun(){
   G.phase = 'finished';
   G.resultTimer = CONFIG.finishDelay;
   G.score = computeScore();
+  // 完走したランだけ記録する。HOME で途中でやめたランは残さない（§19.3 / §19.4）
+  G.pbInfo = recordsPush(G.score);
+  lastRunStamp = G.pbInfo.stamp || null;
   showJudge(FINISH_RESULT);
 }
 
@@ -1480,6 +1524,8 @@ function goHome(){
   showStartOverlay();
 }
 window.goHome = goHome;
+document.getElementById('btnRank').addEventListener('click',      showRanking);
+document.getElementById('btnRankClose').addEventListener('click', showStartOverlay);
 document.getElementById('btnHome').addEventListener('click',    goHome);
 document.getElementById('btnResHome').addEventListener('click', goHome);
 // 難易度切替（§7.4）。選び直したらコースを作り直す（本数・区間境界・CL は変わらない）
@@ -1530,6 +1576,7 @@ function showJudge(R){
 function hideOverlays(){
   elStartOv.classList.add('hidden');
   elResultOv.classList.add('hidden');
+  elRankOv.classList.add('hidden');
   elCountdn.classList.add('hidden');
 }
 
@@ -1554,6 +1601,168 @@ function spacingRangeText(){
   return (mx - mn < 0.005) ? mn.toFixed(2) + ' m 固定'
                            : mn.toFixed(2) + '〜' + mx.toFixed(2) + ' m';
 }
+
+/* =========================================================================
+   自己ランキング（§19.4）
+   端末のブラウザ（localStorage）に保存する。サーバーには何も送らない。
+   ・難易度ごとに独立して持つ。難易度が違うスコアは比較できない（§7.4 守ること 4）
+   ・runs は直近 recordKeepRuns 件のローリング。best は recordKeepBest 件で、
+     ★古くなっても消さない。runs だけだと自己ベストが押し出されて消えるため
+   ・localStorage が使えない環境（プライベートブラウズ等）でも落ちないこと（§19.2）
+   ========================================================================= */
+var TRICK_ABBR = { '360':'360', 'backFull':'BF', 'cork720':'CK' };
+var lastRunStamp = null;   // 直前に完走したランの時刻。ランキングで色を付けるため。
+                           // G に持つと HOME や RETRY で消えるのでここに置く
+
+function storageOk(){
+  try {
+    var k = '__mc_probe__';
+    window.localStorage.setItem(k, '1');
+    window.localStorage.removeItem(k);
+    return true;
+  } catch (e) { return false; }
+}
+var recordsAvailable = storageOk();
+
+function emptyDiffRec(){ return { runs: [], best: [] }; }
+
+function recordsLoad(){
+  var db = { v: 1, d: {} };
+  if (recordsAvailable) {
+    try {
+      var raw = window.localStorage.getItem(CONFIG.recordStoreKey);
+      if (raw) {
+        var o = JSON.parse(raw);
+        if (o && o.v === 1 && o.d && typeof o.d === 'object') db = o;
+      }
+    } catch (e) { /* 壊れていたら既定値で続ける。消さない */ }
+  }
+  for (var k in DIFF_LABEL) {
+    if (!db.d[k] || !(db.d[k].runs instanceof Array) || !(db.d[k].best instanceof Array)) {
+      db.d[k] = emptyDiffRec();
+    }
+  }
+  return db;
+}
+
+function recordsSave(db){
+  if (!recordsAvailable) return false;
+  try { window.localStorage.setItem(CONFIG.recordStoreKey, JSON.stringify(db)); return true; }
+  catch (e) { return false; }   // 容量超過などでも滑走は止めない
+}
+
+/* 1 本ぶんを積む。戻り値でリザルトの表示を決める */
+function recordsPush(s){
+  var diff = s.difficulty;
+  if (!DIFF_LABEL[diff]) return { saved:false, rank:null, isPb:false, prevBest:null };
+  var db = recordsLoad(), rec = db.d[diff];
+  var prevBest = rec.best.length ? rec.best[0].total : null;
+
+  var e = {
+    // t は表示用の時刻。同じミリ秒に 2 本入りうるので、識別には必ず id を使う
+    id:    String(Date.now()) + '-' + Math.floor(Math.random() * 1e6),
+    t:     Date.now(),
+    total: +s.totalScore.toFixed(2),
+    turn:  +s.total.toFixed(2),
+    air:   +s.airScore.toFixed(2),
+    tsc:   +s.timeScore.toFixed(2),
+    sec:   +s.time.toFixed(2),
+    a1:    CONFIG.selectedAir1,
+    a2:    CONFIG.selectedAir2
+  };
+
+  rec.runs.unshift(e);
+  if (rec.runs.length > CONFIG.recordKeepRuns) rec.runs.length = CONFIG.recordKeepRuns;
+
+  rec.best.push(e);
+  rec.best.sort(function(a, b){ return b.total - a.total || a.t - b.t; });
+  if (rec.best.length > CONFIG.recordKeepBest) rec.best.length = CONFIG.recordKeepBest;
+
+  // ★参照そのもので探す。時刻で照合すると同一ミリ秒の別ランと取り違える
+  var at = rec.best.indexOf(e);
+  var rank = at >= 0 ? at + 1 : null;
+
+  return {
+    saved:    recordsSave(db),
+    rank:     rank,
+    isPb:     rank === 1,
+    prevBest: prevBest,
+    stamp:    e.id
+  };
+}
+
+function fmtDay(ms){
+  var d = new Date(ms);
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+function fmtDayTime(ms){
+  var d = new Date(ms), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function trickPair(e){
+  return (TRICK_ABBR[e.a1] || e.a1) + '+' + (TRICK_ABBR[e.a2] || e.a2);
+}
+
+/* リザルトに出す 1 行（§19.4）。行が空なら CSS で消えるのでリザルトは高くならない */
+function pbLineText(info){
+  if (!info) return { text:'', sub:false };
+  if (!info.saved)        return { text:'この端末では記録を保存できません', sub:true };
+  if (info.isPb && info.prevBest === null)
+    return { text:'★ この難易度の初記録', sub:false };
+  if (info.isPb)
+    return { text:'★ 自己ベスト更新（これまで ' + info.prevBest.toFixed(2) + '）', sub:false };
+  if (info.rank)
+    return { text:'自己ベスト ' + info.rank + ' 位', sub:false };
+  return { text:'自己ベストは ' + (info.prevBest !== null ? info.prevBest.toFixed(2) : '—'), sub:true };
+}
+
+function showRanking(){
+  var diff = CONFIG.difficulty;
+  var db = recordsLoad(), rec = db.d[diff] || emptyDiffRec();
+  var mine = lastRunStamp;                          // 直前のランを目立たせる
+
+  document.getElementById('rankDiff').textContent =
+    (DIFF_LABEL[diff] || diff) + '　COURSE ' + G.moguls.length + ' TURNS';
+
+  var best = rec.best.map(function(e, i){
+    return '<div class="rankRow' + (i === 0 ? ' top' : '') + (e.id === mine ? ' me' : '') + '">' +
+           '<span class="rn">' + (i + 1) + '</span>' +
+           '<span class="rs">' + e.total.toFixed(2) + '</span>' +
+           '<span class="rd">' + trickPair(e) + '</span>' +
+           '<span class="rx">' + e.sec.toFixed(2) + 's　' + fmtDay(e.t) + '</span></div>';
+  }).join('');
+
+  var recent = rec.runs.map(function(e){
+    return '<div class="rankRow' + (e.id === mine ? ' me' : '') + '">' +
+           '<span class="rd">' + fmtDayTime(e.t) + '</span>' +
+           '<span class="rs">' + e.total.toFixed(2) + '</span>' +
+           '<span class="rx">' + trickPair(e) + '　' + e.sec.toFixed(2) + 's</span></div>';
+  }).join('');
+
+  document.getElementById('rankBest').innerHTML   = best;
+  document.getElementById('rankRecent').innerHTML = recent;
+
+  var none = rec.runs.length === 0;
+  document.getElementById('rankBest').style.display   = none ? 'none' : '';
+  document.getElementById('rankRecent').style.display = none ? 'none' : '';
+  var titles = document.querySelectorAll('#rankCard .resSecTitle');
+  for (var i = 0; i < titles.length; i++) titles[i].style.display = none ? 'none' : '';
+  document.getElementById('rankEmpty').textContent = !recordsAvailable
+    ? 'この端末では記録を保存できません。プライベートブラウズを解除するか、別のブラウザでお試しください。'
+    : (none ? 'この難易度の記録はまだありません。1 本滑ると残ります。' : '');
+
+  document.getElementById('rankNote').textContent =
+    'コースは毎回同じ配置なので、同じ難易度どうしは比べられます。' +
+    '記録はこの端末にだけ残ります（直近 ' + CONFIG.recordKeepRuns + ' 件／ベスト ' +
+    CONFIG.recordKeepBest + ' 件は消えません）。';
+
+  elStartOv.classList.add('hidden');
+  elResultOv.classList.add('hidden');
+  elRankOv.classList.remove('hidden');
+}
+window.showRanking  = showRanking;
+window.recordsLoad  = recordsLoad;
+window.recordsPush  = recordsPush;
 
 function showStartOverlay(){
   document.getElementById('ovCourse').textContent = courseMeters().toFixed(0) + ' m';
@@ -1583,6 +1792,7 @@ function showStartOverlay(){
     btns[i].classList.toggle('on', btns[i].getAttribute('data-diff') === CONFIG.difficulty);
   }
   elResultOv.classList.add('hidden');
+  elRankOv.classList.add('hidden');
   elStartOv.classList.remove('hidden');
 }
 
@@ -1612,6 +1822,10 @@ function showResult(){
   document.getElementById('resFalls').textContent   =
     s.falls + (s.airFalls ? ' ＋ エア ' + s.airFalls + '×' + CONFIG.airFallWeight : '');
   // TOTAL / AIR / TIME（§18.3〜18.5）。★100 に正規化しない
+  var pb = pbLineText(G.pbInfo);
+  var elPb = document.getElementById('resPb');
+  elPb.textContent = pb.text;
+  elPb.classList.toggle('sub', !!pb.sub);
   document.getElementById('resTotal').textContent     = s.totalScore.toFixed(2);
   document.getElementById('resTotalMax').textContent  = CONFIG.totalScoreMax;
   document.getElementById('resAirScore').textContent  = s.airScore.toFixed(2);
