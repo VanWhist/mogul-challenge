@@ -146,7 +146,7 @@
   .bigbtn.ghost:active{background:rgba(143,180,212,.18);}
   #resBtnRow,#startBtnRow,#startSubRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   /* START は主操作なので単独の行。RANKING / HELP は 1 段下げて小さく（§19.5） */
-  .bigbtn.sm{font-size:11px;padding:9px 20px;margin-top:9px;letter-spacing:.14em;}
+  .bigbtn.sm{font-size:11px;padding:9px 14px;margin-top:9px;letter-spacing:.08em;}
   /* 構成ごとの上限（§18.5）。ハードコードせず CONFIG から計算した値を入れる */
   #ovMax{font-size:10px;letter-spacing:.08em;color:#7fe0b0;margin-top:5px;}
   /* あそびかた（§19.5） */
@@ -159,6 +159,30 @@
   #helpCard .bigbtn{display:block;margin-left:auto;margin-right:auto;}
   #stage.shortres .helpSec{margin-top:9px;padding-top:6px;}
   #stage.shortres .helpP{line-height:1.6;}
+  /* --- チュートリアル（§19.7）--- */
+  #tutSide{position:absolute;top:0;bottom:0;width:50%;z-index:3;pointer-events:none;
+    display:none;background:radial-gradient(circle at center,rgba(47,155,255,.30),rgba(47,155,255,0) 62%);
+    animation:tutPulse 1.05s ease-in-out infinite;}
+  #tutSide.on{display:block;}
+  #tutSide.left{left:0;}  #tutSide.right{right:0;}
+  #tutSide.both{left:0;width:100%;}
+  @keyframes tutPulse{0%,100%{opacity:.35;}50%{opacity:1;}}
+  #tutBar{position:absolute;left:12px;right:12px;top:27%;z-index:6;pointer-events:none;
+    background:rgba(8,20,34,.93);border:1px solid rgba(143,180,212,.35);border-radius:12px;
+    padding:12px 14px;text-align:center;display:none;}
+  #tutBar.on{display:block;}
+  #tutStep{font-size:9px;letter-spacing:.18em;color:#7fb2dd;margin-bottom:5px;}
+  #tutMsg{font-size:13px;line-height:1.65;color:#eaf3fb;font-weight:700;}
+  #tutMsg em{font-style:normal;color:#7fe0b0;}
+  #tutSub{font-size:10.5px;line-height:1.6;color:#a9c6de;margin-top:5px;font-weight:400;}
+  #tutSub:empty{display:none;}
+  #tutTap{font-size:10px;letter-spacing:.2em;color:#2f9bff;margin-top:7px;font-weight:900;
+    animation:tutPulse 1.05s ease-in-out infinite;}
+  #tutTap:empty{display:none;}
+  /* ★SKIP はキャンバスの上に置かない。画面の左右タップがターン入力なので、
+     HUD と重なるうえ誤タップの元になる。下の操作バー（stage の外）に出す（§19.7）*/
+  #tutSkip{display:none;}
+  #tutSkip.on{display:block;}
   /* --- 自己ランキング（§19.4）--- */
   #rankCard{width:100%;max-width:320px;}
   .rankRow{display:flex;align-items:baseline;gap:8px;font-size:11px;line-height:1.95;
@@ -205,6 +229,8 @@
   #stage.shortres .resSecTitle{margin-top:7px;}
   #stage.shortres .resSmall{line-height:1.55;}
   #stage.shortres .bigbtn{padding:9px 30px;margin-top:10px;}   /* 高さは min-height 44px を割らない */
+  /* ★sm は縦の短い画面でも詰めたまま。ここを書かないと 320px で 3 つが 2 行に折り返す */
+  #stage.shortres .bigbtn.sm{padding:9px 14px;margin-top:8px;}
   #stage.shortres .ovSub{margin-bottom:8px;}
   #stage.shortres .resNote{margin-top:6px;}
   #stage.shortres #resPb{margin-top:3px;font-size:10px;}
@@ -303,6 +329,7 @@
       <span id="btnrow">
         <button id="btnWindows" type="button">窓 OFF</button>
         <button id="btnDebug" type="button">DEBUG ON</button>
+        <button id="tutSkip" type="button">SKIP</button>
         <button id="btnRestart" type="button">RESTART</button>
         <button id="btnHome" type="button">HOME</button>
       </span>
@@ -341,10 +368,19 @@
       <button class="bigbtn" id="btnStart" type="button">START</button>
     </div>
     <div id="startSubRow">
+      <button class="bigbtn ghost sm" id="btnTut"  type="button">TUTORIAL</button>
       <button class="bigbtn ghost sm" id="btnRank" type="button">RANKING</button>
       <button class="bigbtn ghost sm" id="btnHelp" type="button">HELP</button>
     </div>
     <div class="resNote">← / A ・ → / D ／ 画面左右タップ</div>
+  </div>
+
+  <div id="tutSide"></div>
+  <div id="tutBar">
+    <div id="tutStep"></div>
+    <div id="tutMsg"></div>
+    <div id="tutSub"></div>
+    <div id="tutTap"></div>
   </div>
 
   <div class="overlay hidden" id="helpOverlay">
@@ -459,6 +495,12 @@ var CONFIG = {
   recordKeepRuns:   10,     // 難易度ごとに残す「直近のラン」の件数
   recordKeepBest:    3,     // 難易度ごとに残す「自己ベスト」の件数（古くなっても消さない）
   helpSeenKey:      'mogulChallenge.seenHelp.v1',  // あそびかたを見たかどうか（§19.5）
+  // --- チュートリアル（§19.7）---
+  tutSeenKey:       'mogulChallenge.seenTut.v1',   // チュートリアルを終えたかどうか
+  tutSlowScale:     0.42,   // 「ゆっくり」段階のスクロール倍率
+  tutSlowTurns:        3,   // ゆっくりで滑るコブの本数（★上部区間 7 本に収める。2+3+2=7）
+  tutNormalTurns:      2,   // 通常速度で滑るコブの本数（同上）
+  tutHoldTime:       1.5,   // 成功メッセージを見せる秒数
   mogulOffsetX:     56,     // センターからのコブの左右オフセット(px)
   judgeLineY:       0.72,   // TURN JUDGE LINE の縦位置（画面高さに対する比率）
 
@@ -896,6 +938,7 @@ function resetGame(){
   };
   showJudge(null);
   hideOverlays();
+  tutCleanupUi();          // チュートリアルの表示を必ず消す（§19.7）。G は作り直されるので tut も消える
   buildProgressMarks();
 }
 
@@ -1269,6 +1312,7 @@ function activeTarget(dAt){
 function handleTurnInput(dir, tMs){
   if (G.phase !== 'running') return;                  // スタート前・フィニッシュ後は受け付けない（§27）
   if (G.fallTimer > 0) return;                        // 転倒中は操作を受け付けない（§15）
+  if (G.tut && !G.tutPass && tutInput(dir, tMs)) return;   // チュートリアルが受け取った（§19.7）
 
   // エア区間の入力（§17.3.2 / §17.4）。左右どちらでもよく、ターンの入力ロックには縛られない。
   // どちらのエア区間にいるかは位置から引く（§29）
@@ -1402,12 +1446,19 @@ function startCountdown(){
 }
 
 function finishRun(){
+  // 教えている最中にコース末尾まで来てしまったら、採点せず終了させる（§19.7）
+  if (G.tut) { endTutorial(); return; }
   G.phase = 'finished';
   G.resultTimer = CONFIG.finishDelay;
   G.score = computeScore();
-  // 完走したランだけ記録する。HOME で途中でやめたランは残さない（§19.3 / §19.4）
-  G.pbInfo = recordsPush(G.score);
-  lastRunStamp = G.pbInfo.stamp || null;
+  // 完走したランだけ記録する。HOME で途中でやめたランは残さない（§19.3 / §19.4）。
+  // ★チュートリアルから続けたランはリザルトを出すが記録しない（止めてもらった PERFECT を含むため）
+  if (G.fromTutorial) {
+    G.pbInfo = { saved:false, rank:null, isPb:false, prevBest:null, stamp:null, tutorial:true };
+  } else {
+    G.pbInfo = recordsPush(G.score);
+    lastRunStamp = G.pbInfo.stamp || null;
+  }
   showJudge(FINISH_RESULT);
 }
 
@@ -1582,6 +1633,8 @@ function goHome(){
   showStartOverlay();
 }
 window.goHome = goHome;
+document.getElementById('btnTut').addEventListener('click',       startTutorial);
+document.getElementById('tutSkip').addEventListener('click',      endTutorial);
 document.getElementById('btnRank').addEventListener('click',      showRanking);
 document.getElementById('btnHelp').addEventListener('click',      showHelp);
 document.getElementById('btnHelpClose').addEventListener('click', function(){
@@ -1770,6 +1823,7 @@ function trickPair(e){
 /* リザルトに出す 1 行（§19.4）。行が空なら CSS で消えるのでリザルトは高くならない */
 function pbLineText(info){
   if (!info) return { text:'', sub:false };
+  if (info.tutorial)      return { text:'練習ランのため記録には残していません', sub:true };
   if (!info.saved)        return { text:'この端末では記録を保存できません', sub:true };
   if (info.isPb && info.prevBest === null)
     return { text:'★ この難易度の初記録', sub:false };
@@ -1851,6 +1905,268 @@ function currentMaxScore(){
   };
 }
 window.currentMaxScore = currentMaxScore;
+
+/* =========================================================================
+   チュートリアル（§19.7）
+   本物のエンジンをそのまま動かし、教える瞬間だけコースを止める。
+   ★止める位置を「理想の位置ちょうど」にスナップするので、判定は本物の
+     resolveAirSet / resolveAirLanding / handleTurnInput を通って PERFECT になる。
+     専用の採点を書かない（仕様が二重にならないようにするため）。
+   ★チュートリアルのランは記録しない。finishRun には入らない（§19.4）。
+   ========================================================================= */
+var elTutBar  = document.getElementById('tutBar');
+var elTutSide = document.getElementById('tutSide');
+var elTutSkip = document.getElementById('tutSkip');
+
+var TUT_ORDER = ['turnStop1', 'turnStop2', 'slow', 'normal', 'airSet', 'airLand', 'free'];
+
+/* チュートリアルの表示だけを消す。resetGame から必ず呼ぶ（§19.7）*/
+function tutCleanupUi(){
+  var bar = document.getElementById('tutBar');
+  var skip = document.getElementById('tutSkip');
+  var side = document.getElementById('tutSide');
+  if (bar)  bar.classList.remove('on');
+  if (skip) skip.classList.remove('on');
+  if (side) side.className = '';
+}
+
+function tutSeen(){
+  if (!recordsAvailable) return false;
+  try { return window.localStorage.getItem(CONFIG.tutSeenKey) === '1'; } catch (e) { return false; }
+}
+function markTutSeen(){
+  if (!recordsAvailable) return;
+  try { window.localStorage.setItem(CONFIG.tutSeenKey, '1'); } catch (e) { /* 無視 */ }
+}
+
+function tutShow(step, msg, sub, tap, side){
+  document.getElementById('tutStep').textContent = step || '';
+  document.getElementById('tutMsg').innerHTML    = msg || '';
+  document.getElementById('tutSub').textContent  = sub || '';
+  document.getElementById('tutTap').textContent  = tap || '';
+  elTutBar.classList.add('on');
+  elTutSide.className = side ? ('on ' + side) : '';
+}
+function tutHideSide(){ elTutSide.className = ''; }
+
+/* 先送りする。飛ばしたコブは 'skip' にして Major MISS にしない */
+function tutJumpTo(d){
+  for (var i = 0; i < G.moguls.length; i++) {
+    var m = G.moguls[i];
+    if (m.d < d && m.result === null) { m.result = 'skip'; m.judged = true; }
+  }
+  G.playerD = d;
+}
+
+function tutFirstTarget(){
+  for (var i = 0; i < G.moguls.length; i++) if (G.moguls[i].result === null) return G.moguls[i];
+  return null;
+}
+
+function startTutorial(){
+  resetGame();
+  hideOverlays();
+  G.phase = 'running';
+  G.tut = { i: -1, wait: false, hold: 0, scale: 1, target: null, air: null, base: 0 };
+  elTutSkip.classList.add('on');
+  tutEnter(0);
+}
+window.startTutorial = startTutorial;
+
+function tutEnter(i){
+  var T = G.tut; if (!T) return;
+  T.i = i; T.wait = false; T.hold = 0; T.target = null;
+  var name = TUT_ORDER[i];
+  var a = G.airs[0];
+
+  if (name === 'turnStop1' || name === 'turnStop2') {
+    T.scale = 0.42;
+    T.target = tutFirstTarget();
+    tutShow('ターン ' + (i + 1) + ' / 2',
+            name === 'turnStop1'
+              ? 'コブが近づいてきます。<em>判定ライン（点線）に重なった瞬間</em>で止めます。'
+              : 'もう一度。ターンは<em>左右交互</em>です。',
+            '', '', null);
+  } else if (name === 'slow') {
+    T.scale = CONFIG.tutSlowScale;
+    T.base = tutJudgedCount();
+    tutShow('ゆっくり滑る',
+            'このリズムで、<em>左右交互にタップ</em>。',
+            'いまは通常の ' + Math.round(CONFIG.tutSlowScale * 100) + '% の速さです。外しても止まりません。',
+            '', null);
+  } else if (name === 'normal') {
+    T.scale = 1;
+    T.base = tutJudgedCount();
+    tutShow('通常の速さ', 'ここから<em>本番と同じ速さ</em>です。', '', '', null);
+  } else if (name === 'airSet') {
+    T.scale = 0.5;
+    T.air = a;
+    // ★前にしか飛ばさない。後ろへ戻すと通過ずみのコブとエアの状態が壊れる
+    var jump = a.dApproach - CONFIG.pxPerMeter * 6;
+    if (G.playerD < jump) tutJumpTo(jump);
+    tutShow('エア ①セット', 'エア台が来ます。<em>リップの ' + CONFIG.airSetIdealM +
+            ' m 手前</em>で構えを作ります。', '止まったところがその位置です。', '', null);
+  } else if (name === 'airLand') {
+    T.scale = 0.5;
+    T.air = a;
+    tutShow('エア ②着地', '空中です。<em>着地の瞬間</em>にもう一度タップします。', '', '', null);
+  } else if (name === 'free') {
+    // 教えるのはここまで。あとは止めずにゴールまで滑ってもらう（§19.7）
+    T.scale = 1;
+    markTutSeen();
+    tutHideSide();
+    tutShow('ここから自由に', 'あとは<em>ゴールまで滑ってみましょう</em>。',
+            'コブは残り ' + tutRemainingTurns() + ' 本、エアはあと 1 本。' +
+            '止めるのはここまでです。',
+            '', null);
+    T.free = true;
+    T.msgT = 3.0;                 // 帯を 3 秒だけ残してから消す。コースは止めない
+  }
+}
+
+function tutRemainingTurns(){
+  var n = 0;
+  for (var i = 0; i < G.moguls.length; i++) if (G.moguls[i].result === null) n++;
+  return n;
+}
+
+function tutJudgedCount(){
+  var n = 0;
+  for (var i = 0; i < G.moguls.length; i++) if (G.moguls[i].result !== null) n++;
+  return n;
+}
+
+/* 移動する前に呼ぶ。止めている間は scrollFactor を 0 にする */
+function tutPreMove(){
+  var T = G.tut; if (!T) return;
+  if (T.free)                    return;    // 自由に滑る段階。速さも止めもいじらない
+  if (T.wait || T.hold > 0) G.scrollFactor = 0;
+  else                      G.scrollFactor *= T.scale;
+}
+
+/* 移動したあとに呼ぶ。止める位置に達したかどうかを見る */
+function tutPostMove(dt){
+  var T = G.tut; if (!T) return;
+  var name = TUT_ORDER[T.i];
+
+  // 自由に滑る段階。帯を消したらチュートリアルは終わり（コースは止めない・記録もしない）
+  if (T.free) {
+    if (T.msgT > 0) {
+      T.msgT = Math.max(0, T.msgT - dt);
+      if (T.msgT <= 0) tutReleaseToFreeRun();
+    }
+    return;
+  }
+
+  if (T.hold > 0) {
+    T.hold = Math.max(0, T.hold - dt);
+    if (T.hold <= 0) tutEnter(T.i + 1);
+    return;
+  }
+  if (T.wait) return;                       // タップ待ち。位置は動かない
+
+  if (name === 'turnStop1' || name === 'turnStop2') {
+    var m = T.target;
+    if (!m) { tutEnter(T.i + 1); return; }
+    if (G.playerD >= m.d) {                 // ★判定ラインちょうどで止める
+      G.playerD = m.d;
+      T.wait = true;
+      tutShow('ターン ' + (T.i + 1) + ' / 2',
+              'いまです。<em>' + (m.side < 0 ? '画面の左' : '画面の右') + '</em>をタップ。',
+              'コブが線に重なっています。ここが PERFECT の位置。',
+              'タップしてください', m.side < 0 ? 'left' : 'right');
+    }
+  } else if (name === 'slow' || name === 'normal') {
+    var need = name === 'slow' ? CONFIG.tutSlowTurns : CONFIG.tutNormalTurns;
+    if (tutJudgedCount() - T.base >= need) { tutHideSide(); tutEnter(T.i + 1); }
+  } else if (name === 'airSet') {
+    var a = T.air;
+    if (a && !a.setDone && G.playerD >= a.dSet) {   // ★セットの理想位置ちょうどで止める
+      G.playerD = a.dSet;
+      T.wait = true;
+      tutShow('エア ①セット', 'いまタップ。<em>ここで構えを作ります</em>。',
+              'リップまであと ' + CONFIG.airSetIdealM + ' m。左右どちらをタップしても同じです。',
+              'タップしてください', 'both');
+    }
+  } else if (name === 'airLand') {
+    var b = T.air;
+    if (b && b.stage === 'flight' && b.result === null && G.playerD >= b.dLand) {
+      G.playerD = b.dLand;                          // ★理想の着地点ちょうどで止める
+      T.wait = true;
+      tutShow('エア ②着地', 'いまタップ。<em>ここが着地の瞬間</em>。',
+              '早すぎると後傾、遅すぎると前傾になります。',
+              'タップしてください', 'both');
+    }
+  }
+}
+
+/* 止めている間の入力。true を返したら通常の入力処理はしない */
+function tutInput(dir, tMs){
+  var T = G.tut; if (!T) return false;
+  if (T.free)   return false;               // 自由に滑る段階。本物の判定にそのまま渡す
+  if (T.hold > 0) return true;              // メッセージを見せている間は無視
+  if (!T.wait) return false;                // ゆっくり／通常の段階は本物の判定に任せる
+  var name = TUT_ORDER[T.i];
+
+  if (name === 'turnStop1' || name === 'turnStop2') {
+    var m = T.target;
+    if (dir !== m.side) {                   // 逆はやり直し。減点にはしない
+      tutShow('ターン ' + (T.i + 1) + ' / 2',
+              '反対です。<em>' + (m.side < 0 ? '画面の左' : '画面の右') + '</em>をタップ。',
+              'コブがある側と同じ側をタップします。',
+              'タップしてください', m.side < 0 ? 'left' : 'right');
+      return true;
+    }
+    G.tutPass = true;                       // 再入を防ぐ
+    handleTurnInput(dir, tMs);              // ★本物の判定を通す。止めているので PERFECT になる
+    G.tutPass = false;
+    T.wait = false; tutHideSide();
+    tutShow('ターン ' + (T.i + 1) + ' / 2', 'PERFECT。<em>これがタイミング</em>です。',
+            'コブが線に重なった瞬間にタップする。それだけです。', '', null);
+    T.hold = CONFIG.tutHoldTime;
+    return true;
+  }
+
+  if (name === 'airSet') {
+    resolveAirSet(T.air, tMs);              // ★本物の判定。位置を合わせてあるので perfect
+    T.wait = false; tutHideSide();
+    tutShow('エア ①セット', 'セット完了。<em>構えができました</em>。',
+            'この構えの出来が、エアの点に掛かります。', '', null);
+    T.hold = CONFIG.tutHoldTime;
+    return true;
+  }
+
+  if (name === 'airLand') {
+    resolveAirLanding(T.air, tMs);          // ★本物の判定。位置を合わせてあるので perfect
+    T.wait = false; tutHideSide();
+    tutShow('エア ②着地', 'PERFECT。<em>これで 1 本のエア</em>です。',
+            'セットと着地の 2 回。踏み切る操作はありません。', '', null);
+    T.hold = CONFIG.tutHoldTime;
+    return true;
+  }
+  return true;
+}
+
+/* 教える役目を終えてチュートリアルを解く。ランはそのまま続く（§19.7）。
+   ★このランは「止めてもらった PERFECT」を含むので、ランキングには残さない */
+function tutReleaseToFreeRun(){
+  G.tut = null;
+  G.fromTutorial = true;          // finishRun がこれを見て記録を飛ばす
+  elTutBar.classList.remove('on');
+  elTutSkip.classList.remove('on');
+  tutHideSide();
+}
+
+function endTutorial(){
+  G.tut = null;
+  elTutBar.classList.remove('on');
+  elTutSkip.classList.remove('on');
+  tutHideSide();
+  markTutSeen();
+  resetGame();
+  showStartOverlay();
+}
+window.endTutorial = endTutorial;
 
 function showHelp(){
   // 距離はここでも CONFIG から出す（§17.3.2 の理想位置を変えたら文章も追従する）
@@ -2046,11 +2362,13 @@ function update(now){
     G.scrollFactor = 1;
   }
   if (G.phase === 'ready' || G.phase === 'countdown') G.scrollFactor = 0;   // スタート前は動かない
+  tutPreMove();                                   // チュートリアル（§19.7）。止める／ゆっくりにする
 
   G.playerD += CONFIG.baseScroll * G.speed * G.scrollFactor * dt;   // speed はスクロール速度倍率のみ（§12.2）
   G.lastMs = now;
 
   resolvePassed(G.playerD);
+  tutPostMove(dt);                                // 止める位置に達したかを見る（§19.7）
 
   if (G.phase === 'running') updateAir(dt);        // AIR 1（§17）
 
@@ -2879,9 +3197,10 @@ if (!debugMode) {
 }
 
 resetGame();
-// 初めて開いた人にはあそびかたを先に出す（§19.5）。2 回目からはスタート画面から
-if (helpSeen()) showStartOverlay();
-else            showHelp();
+// 初めて開いた人にはチュートリアルから始める（§19.7）。2 回目からはスタート画面から。
+// 文章の「あそびかた」は自動では出さず、HELP からいつでも読める（§19.5）
+if (tutSeen()) showStartOverlay();
+else           startTutorial();
 G.lastMs = performance.now();
 requestAnimationFrame(frame);
 </script>
