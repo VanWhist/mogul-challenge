@@ -199,6 +199,12 @@
   #resPb{font-size:11px;font-weight:700;color:#7fe0b0;letter-spacing:.06em;margin-top:6px;}
   #resPb:empty{display:none;}
   #resPb.sub{color:#8fb4d4;font-weight:400;}
+  /* スコアのカウントアップと上限到達（§20.7）*/
+  .resScoreV{transition:transform .16s ease-out;display:inline-block;}
+  .resScoreV.pop{transform:scale(1.12);}
+  .resScoreV.max{color:#ffd479;text-shadow:0 0 18px rgba(255,212,121,.55);}
+  #resMaxTag{font-size:10px;letter-spacing:.22em;color:#ffd479;font-weight:900;margin-top:4px;}
+  #resMaxTag:empty{display:none;}
 
   /* カウントダウンはコースを隠さない（背景なし） */
   #countdown{position:absolute;left:0;right:0;top:38%;z-index:4;text-align:center;
@@ -230,11 +236,31 @@
   #stage.shortres .resSmall{line-height:1.55;}
   #stage.shortres .bigbtn{padding:9px 30px;margin-top:10px;}   /* 高さは min-height 44px を割らない */
   /* ★sm は縦の短い画面でも詰めたまま。ここを書かないと 320px で 3 つが 2 行に折り返す */
-  #stage.shortres .bigbtn.sm{padding:9px 14px;margin-top:8px;}
+  #stage.shortres .bigbtn.sm{padding:9px 14px;margin-top:5px;}
+  #stage.shortres #ovMax{margin-top:3px;}
+  #stage.shortres #startBtnRow .bigbtn{margin-top:9px;}
   #stage.shortres .ovSub{margin-bottom:8px;}
-  #stage.shortres .resNote{margin-top:6px;}
+  #stage.shortres .resNote{margin-top:4px;font-size:8.5px;}
   #stage.shortres #resPb{margin-top:3px;font-size:10px;}
   #stage.shortres .rankRow{line-height:1.7;}
+  /* --- スポンサー枠（§21）---
+     タイトル画面とリザルト画面にだけ出す。ゲーム画面には出さない。
+     ★空き枠（SPONSOR WANTED）は営業用の見本を兼ねる。実在企業のロゴは
+       権利者の許諾が取れるまで入れない（CONFIG.sponsors は既定で空） */
+  .spBand{width:100%;max-width:320px;margin-top:14px;
+    border-top:1px solid rgba(143,180,212,.22);padding-top:9px;}
+  .spBand.hidden{display:none;}
+  .spLbl{font-size:8px;letter-spacing:.24em;color:#5f88ab;margin-bottom:6px;}
+  .spRow{display:flex;gap:7px;justify-content:center;}
+  .spSlot{flex:1 1 0;min-width:0;height:42px;border-radius:8px;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .spSlot.empty{border:1px dashed rgba(143,180,212,.42);background:rgba(143,180,212,.06);}
+  .spSlot.filled{background:rgba(255,255,255,.92);padding:5px;}
+  .spSlot img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
+  .spK{font-size:8px;letter-spacing:.18em;color:#8fb4d4;font-weight:800;line-height:1.3;}
+  .spV{font-size:8px;color:#5f88ab;line-height:1.4;margin-top:2px;}
+  #stage.shortres .spBand{margin-top:9px;padding-top:6px;}
+  #stage.shortres .spSlot{height:34px;}
   #resRepeat{color:#e0a33a;}
   #resRepeat:empty{display:none;}
 
@@ -371,7 +397,9 @@
       <button class="bigbtn ghost sm" id="btnTut"  type="button">TUTORIAL</button>
       <button class="bigbtn ghost sm" id="btnRank" type="button">RANKING</button>
       <button class="bigbtn ghost sm" id="btnHelp" type="button">HELP</button>
+      <button class="bigbtn ghost sm" id="btnSound" type="button">♪ ON</button>
     </div>
+    <div class="spBand" id="spTitle"></div>
     <div class="resNote">← / A ・ → / D ／ 画面左右タップ</div>
   </div>
 
@@ -435,6 +463,7 @@
       <div class="ovSub" id="resDiff">上級</div>
       <div class="resTime">TOTAL SCORE</div>
       <div><span class="resScoreV" id="resTotal">0.00</span><span class="resScoreMax"> / <span id="resTotalMax">100</span></span></div>
+      <div id="resMaxTag"></div>
       <div id="resPb"></div>
       <div class="resSec">
         <div class="resRow"><span class="rk">TURN</span><span class="rv" id="resScore">0.0</span><span class="rp">/ 60</span></div>
@@ -471,6 +500,7 @@
         <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
         <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
       </div>
+      <div class="spBand" id="spResult"></div>
       <div class="resNote">TURN 60 ＋ AIR 20 ＋ TIME 20 ＝ 100（現在の技での最大は 97.6）</div>
     </div>
   </div>
@@ -501,6 +531,33 @@ var CONFIG = {
   tutSlowTurns:        3,   // ゆっくりで滑るコブの本数（★上部区間 7 本に収める。2+3+2=7）
   tutNormalTurns:      2,   // 通常速度で滑るコブの本数（同上）
   tutHoldTime:       1.5,   // 成功メッセージを見せる秒数
+
+  // --- 見た目（§20 / STEP 8）。色はここだけで決める ---
+  wear: {
+    jacket:     '#e8402f',   // ウェア（上）
+    jacketDark: '#b92c1e',   // 影側
+    bib:        '#f7f2ec',   // 前面のゼッケン地
+    pants:      '#f4f7fa',   // ウェア（下）＝白
+    pantsShade: '#b9cbdc',   // 白は雪に溶けるので、影側を必ず入れる
+    pantsLine:  '#37587a',   // 輪郭。★これが無いと白いウェアが雪に溶けて脚が消える
+    boot:       '#0d1b2a',
+    ski:        '#0f2740',
+    skiTop:     '#5fa8e6',   // 板の上面（見えている側）
+    helmet:     '#16324f',
+    goggle:     '#7fe0b0',
+    pole:       '#0d1b2a'
+  },
+  polePlantTime: 0.34,   // ストックを突いてから戻すまで(秒。§20.4)
+  polePlantDrop: 22,     // 突いたときに石突きが下がる量(px)
+  polePlantOut:   7,     // 突いた側へ手が出る量(px)
+  legGap:        1.6,    // 腰での脚の左右の開き(px)。モーグルは脚を閉じる
+  footGap:       3.0,    // ブーツの左右の開き(px)
+  skiGap:        4.6,    // 板の中心間の半分(px)
+
+  // --- 判定音（§20.6）。音源ファイルは持たず Web Audio で合成する ---
+  soundKey:    'mogulChallenge.sound.v1',
+  soundVolume: 0.16,
+
   mogulOffsetX:     56,     // センターからのコブの左右オフセット(px)
   judgeLineY:       0.72,   // TURN JUDGE LINE の縦位置（画面高さに対する比率）
 
@@ -544,7 +601,7 @@ var CONFIG = {
   absorbFollowsInput: true, // true=タップした瞬間に吸収する / false=コブの位置だけで吸収する
   absorbCycle:      0.85,   // 吸収サイクルの長さ（コブ間隔に対する比率）
   absorbRange:      0.42,   // absorbFollowsInput=false のときだけ使う
-  kneeOut:          7,      // 吸収時に膝が外へ開く量(px)
+  kneeOut:          2.5,    // 吸収時に膝が外へ開く量(px)。★モーグルは脚を閉じるので小さく
   kneeUp:           5,      // 吸収時に膝が持ち上がる量(px)
   absorbLerp:       40,     // 畳み込みの鋭さ。大きいほど「ドン」と入る
   buckHeight:       9,      // MISS 時に突き上げられる量(px)
@@ -721,7 +778,19 @@ var CONFIG = {
   finishDelay:           1.4,   // FINISH 表示からリザルトを出すまで(秒)
   airTint:               'rgba(150,190,225,.20)',  // エア区間の雪面の色
   finishLineColor:       '#d8382c',                // フィニッシュラインの色
-  hudInterval:           0.06   // HUD(DOM) の更新間隔(秒)
+  hudInterval:           0.06,  // HUD(DOM) の更新間隔(秒)
+
+  // --- スポンサー枠（§21）---
+  // ★ここは「データ」。コードにロゴを書かない。実ロゴを載せるときは
+  //   sponsors に { name, img:'data:image/png;base64,...' } を足すだけで切り替わる。
+  //   実在企業のロゴ・パートナーマークは、権利者の許諾が取れるまで入れないこと。
+  sponsorsOn:            true,   // false で枠ごと非表示。ゲーム画面には元々出さない
+  sponsorSlots:          2,      // 並べる枠の数。sponsors が足りない分は空き枠で埋める
+  sponsorLabel:          'SPONSORED BY',  // 実ロゴが 1 つでも入っているときの見出し
+  sponsorLabelEmpty:     'SPONSOR',       // 空き枠だけのときの見出し
+  sponsorWanted:         'SPONSOR WANTED',
+  sponsorNote:           'この枠に協賛ロゴを掲載できます',
+  sponsors:              []     // 例: [{ name:'○○', img:'data:image/png;base64,...' }]
 };
 
 /* =========================================================================
@@ -931,7 +1000,8 @@ function resetGame(){
     fallDir: 1,                    // 転倒で倒れる向き。転倒開始時に固定する
     neutralReturns: 0,             // ニュートラル復帰の作動回数（デバッグ用）
     player: { x:0, targetX:0, sway:0, pop:0, lean:0,
-              comp:0, compQ:0.7, compT:999, buck:0, line:0, disturb:0 },
+              comp:0, compQ:0.7, compT:999, buck:0, line:0, disturb:0,
+              poleT:0, poleSide:0 },        // ストックを突く動作（§20.4。描画のみ）
     shakeX: 0, shakeY: 0,
     particles: [],
     hudAcc: 999
@@ -1091,11 +1161,23 @@ function checkAirCourseInvariant(moguls, zone, label){
 }
 
 // 技ごとの回転の作り（描画のみ）。flip = 縦回転の回数 / yaw = 横回転の回数
+/* flip = 前後の回転数 / yaw = 縦軸まわりの回転数 / tilt = 軸の傾き
+   wob  = 回りながら見える傾きの揺れ（★v6.0）。
+          真後ろから見ると、斜めの軸で回る体は「傾きが左右に振れて」見える。
+          これを入れないと、絵が平面のまま回っているようにしか見えない（§20.8） */
 var AIR_SPIN = {
-  '360':      { flip: 0, yaw: 1, tilt: 0.00 },
-  'backFull': { flip: 1, yaw: 1, tilt: 0.10 },
-  'cork720':  { flip: 1, yaw: 2, tilt: 0.42 }   // オフアクシス＝斜めの軸
+  '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.15 },
+  'backFull': { flip: 1, yaw: 1, tilt: 0.10, wob: 0.22 },
+  'cork720':  { flip: 1, yaw: 2, tilt: 0.42, wob: 0.34 }   // オフアクシス＝斜めの軸
 };
+
+/* 回転の進み方（§20.8）。★等速で回すと機械的に見える。
+   踏切直後はまだ回っていない → 中盤が最も速い → 着地に向けて回り切って止まる。
+   u が 1 を超えた分（着地が遅い）はゆっくり回りすぎる */
+function airRotEase(u){
+  var t = clamp(u, 0, 1);
+  return t * t * (3 - 2 * t) + Math.max(0, u - 1) * 0.35;
+}
 
 var SET_LABEL = { perfect:'PERFECT SET', good:'GOOD SET', none:'NO SET' };
 
@@ -1163,7 +1245,7 @@ function updateOneAir(a, dt){
     // タップするまで回り続ける。タップした瞬間から「開いて」上体を起こす（§17.4）
     if (a.inputDone) a.openT = Math.min(1, a.openT + CONFIG.airOpenLerp * dt);
     var spin = AIR_SPIN[a.trick] || AIR_SPIN['360'];
-    if (!a.inputDone) a.rot = a.u * Math.max(spin.flip, spin.yaw);
+    if (!a.inputDone) a.rot = airRotEase(a.u) * Math.max(spin.flip, spin.yaw);
 
     // 着地の解決（§17.4）。入力があればそのずれで、無ければ猶予を過ぎた時点で FALL
     var win = CONFIG.airLandWindows[a.trick] || CONFIG.airLandWindows['360'];
@@ -1187,6 +1269,7 @@ function resolveAirSet(a, tMs){
               : 'none';
   a.setDeltaM = deltaM;
   a.setDone   = true;
+  if (a.setResult !== 'none') playAirSet();      // 構えができた合図（§20.6）
 
   // タップの瞬間を吸収サイクルのピークにする（§13.1）。そこから伸び上がるのがセットの動作
   G.player.compT = 0;
@@ -1240,6 +1323,7 @@ function resolveAirLanding(a, tMs, forced){
   a.landLeanT = CONFIG.airLandLeanTime;
 
   showJudge(AIR_RESULT[kind]);
+  playAirLand(kind);                   // 着地の音（§20.6）
 
   // 失敗の波及（§17.6）。人工的な減点は足さない
   if (kind === 'miss') {
@@ -1340,6 +1424,8 @@ function handleTurnInput(dir, tMs){
 
   // 選手の横移動は視覚表現のみ（§13.1）。判定には一切使わない
   G.player.targetX = dir * CONFIG.playerOffsetX;
+  G.player.poleT   = CONFIG.polePlantTime;   // タップした側のストックを突く（§20.4。描画のみ）
+  G.player.poleSide = dir;
   G.lastTurnMs = tMs;      // 直近のターン入力時刻（§13.1(4)）。セット・着地では更新しない
 
   var m = activeTarget(dAt);
@@ -1418,6 +1504,7 @@ function applyResult(kind, m){
 
   applySpeed(R.delta, R.gain);
   showJudge(R);
+  playJudge(kind);                     // 判定音（§20.6）
 
   // 演出（§20）
   if (kind === 'perfect' || kind === 'good') {
@@ -1460,6 +1547,7 @@ function finishRun(){
     lastRunStamp = G.pbInfo.stamp || null;
   }
   showJudge(FINISH_RESULT);
+  playFinish();
 }
 
 /* §18.2(2) 吸収・伸展 ＝ リンク重み方式（v2.4）
@@ -1603,6 +1691,7 @@ window.addEventListener('keyup', function(e){
 });
 
 stage.addEventListener('pointerdown', function(e){
+  soundUnlock();                                         // iOS は利用者が触るまで音を出せない
   if (e.target.closest('button')) return;                // HUD ボタンは対象外
   e.preventDefault();
   var rect = stage.getBoundingClientRect();
@@ -1633,6 +1722,12 @@ function goHome(){
   showStartOverlay();
 }
 window.goHome = goHome;
+document.getElementById('btnSound').addEventListener('click', function(){
+  soundOn = !soundOn;
+  soundSavePref();
+  this.textContent = '♪ ' + (soundOn ? 'ON' : 'OFF');
+  if (soundOn) { soundUnlock(); setTimeout(function(){ playJudge('perfect'); }, 30); }   // 押した手応えを返す
+});
 document.getElementById('btnTut').addEventListener('click',       startTutorial);
 document.getElementById('tutSkip').addEventListener('click',      endTutorial);
 document.getElementById('btnRank').addEventListener('click',      showRanking);
@@ -1905,6 +2000,156 @@ function currentMaxScore(){
   };
 }
 window.currentMaxScore = currentMaxScore;
+
+/* =========================================================================
+   判定音（§20.6）
+   ★音源ファイルは持たない。単一ファイルのまま配れるように Web Audio で合成する。
+   ★iOS は「利用者が触るまで」音を鳴らせない。START などのタップで soundUnlock() する。
+   ========================================================================= */
+var audioCtx = null;
+var soundOn  = true;
+
+function soundLoadPref(){
+  if (!recordsAvailable) return true;
+  try {
+    var v = window.localStorage.getItem(CONFIG.soundKey);
+    return v === null ? true : v === '1';        // 既定はオン
+  } catch (e) { return true; }
+}
+function soundSavePref(){
+  if (!recordsAvailable) return;
+  try { window.localStorage.setItem(CONFIG.soundKey, soundOn ? '1' : '0'); } catch (e) { /* 無視 */ }
+}
+
+/* 最初のタップで作る。ここで作らないと iOS では無音のままになる */
+function soundUnlock(){
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) { audioCtx = null; }               // 音が出せなくてもゲームは続ける
+}
+
+/* ---- 雪を切る音（§20.6）------------------------------------------------
+   ★ビープ音ではなく、実際のターンの音に寄せる。
+     カービングの音は「白い雑音を帯域で削ったもの」なので、ノイズ →
+     バンドパス → 音量エンベロープ で作る。ピッチのある音は使わない。 */
+var noiseBuf = null;
+function getNoise(){
+  if (noiseBuf || !audioCtx) return noiseBuf;
+  var n = Math.floor(audioCtx.sampleRate * 0.6);
+  noiseBuf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  var d = noiseBuf.getChannelData(0);
+  for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  return noiseBuf;
+}
+
+/* o = { f0, f1, q, dur, vol, atk } — f0→f1 に動く帯域を通す。
+   エッジが噛んで、切って、抜ける。立ち上がりを少し持たせるのがコツ */
+function carve(o){
+  if (!soundOn || !audioCtx) return;
+  try {
+    var buf = getNoise(); if (!buf) return;
+    var t0  = audioCtx.currentTime;
+    var dur = o.dur, atk = o.atk === undefined ? 0.035 : o.atk;
+
+    var src = audioCtx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    src.playbackRate.value = 0.9 + Math.random() * 0.2;      // 毎回わずかに変える
+
+    var bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = o.q;
+    bp.frequency.setValueAtTime(o.f0, t0);
+    bp.frequency.exponentialRampToValueAtTime(o.f1, t0 + dur);
+
+    var hp = audioCtx.createBiquadFilter();                  // 低い唸りを抜く
+    hp.type = 'highpass'; hp.frequency.value = 180;
+
+    var amp = audioCtx.createGain();
+    var v = CONFIG.soundVolume * (o.vol === undefined ? 1 : o.vol);
+    amp.gain.setValueAtTime(0.0001, t0);
+    amp.gain.linearRampToValueAtTime(v, t0 + atk);           // エッジが噛む
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); // 抜けていく
+
+    src.connect(bp); bp.connect(hp); hp.connect(amp); amp.connect(audioCtx.destination);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+  } catch (e) { /* 鳴らせなくても続ける */ }
+}
+
+/* ドスンという当たり（着地・転倒）。低い側だけ残したノイズ */
+function thud(dur, vol, f){
+  if (!soundOn || !audioCtx) return;
+  try {
+    var buf = getNoise(); if (!buf) return;
+    var t0 = audioCtx.currentTime;
+    var src = audioCtx.createBufferSource(); src.buffer = buf; src.loop = true;
+    var lp = audioCtx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 1.0;
+    lp.frequency.setValueAtTime(f, t0);
+    lp.frequency.exponentialRampToValueAtTime(f * 0.35, t0 + dur);
+    var amp = audioCtx.createGain();
+    var v = CONFIG.soundVolume * vol;
+    amp.gain.setValueAtTime(v, t0);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(lp); lp.connect(amp); amp.connect(audioCtx.destination);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+  } catch (e) { /* 続ける */ }
+}
+
+/* 判定ごとの音（§20.6）。
+   ★良いターンほど「高く・鋭く・短く」抜ける。外すほど低く、ざらつき、長く残る */
+var SOUND_JUDGE = {
+  perfect:   function(){ carve({ f0:2000, f1:3400, q:1.1, dur:0.24, vol:1.00, atk:0.028 }); },
+  good:      function(){ carve({ f0:1500, f1:2400, q:1.2, dur:0.22, vol:0.85, atk:0.034 }); },
+  ok:        function(){ carve({ f0:1050, f1:1500, q:1.5, dur:0.20, vol:0.68, atk:0.045 }); },
+  miss:      function(){ carve({ f0: 620, f1: 380, q:3.2, dur:0.26, vol:0.80, atk:0.012 }); },
+  majorMiss: function(){ carve({ f0: 420, f1: 200, q:4.0, dur:0.34, vol:0.90, atk:0.010 });
+                         thud(0.16, 0.55, 320); },
+  whiff:     function(){ carve({ f0: 900, f1: 800, q:2.0, dur:0.07, vol:0.30, atk:0.010 }); }
+};
+function playJudge(kind){ var f = SOUND_JUDGE[kind]; if (f) f(); }
+
+/* 構えを作る＝板を雪面に置き直す音。短く柔らかいブラシ */
+function playAirSet(){ carve({ f0:1300, f1:1800, q:0.9, dur:0.16, vol:0.55, atk:0.05 }); }
+
+function playAirLand(k){
+  if (k === 'perfect')   { thud(0.20, 0.75, 900); carve({ f0:1800, f1:2800, q:1.1, dur:0.26, vol:0.85, atk:0.02 }); }
+  else if (k === 'good') { thud(0.20, 0.70, 760); carve({ f0:1400, f1:2100, q:1.3, dur:0.24, vol:0.70, atk:0.03 }); }
+  else if (k === 'deep') { thud(0.24, 0.75, 560); carve({ f0: 900, f1:1200, q:1.8, dur:0.22, vol:0.55, atk:0.04 }); }
+  else if (k === 'miss') { thud(0.28, 0.85, 420); carve({ f0: 600, f1: 380, q:3.0, dur:0.26, vol:0.65, atk:0.01 }); }
+  else                   { thud(0.42, 1.00, 260); carve({ f0: 380, f1: 170, q:3.5, dur:0.40, vol:0.75, atk:0.01 }); }
+}
+
+/* フィニッシュ＝止まるときの横滑り。長く抜けていく一発 */
+function playFinish(){
+  carve({ f0:2600, f1:600, q:0.8, dur:0.85, vol:1.0, atk:0.09 });
+}
+
+/* 短い電子音。いまは「上限到達」の合図だけに使う（§20.7） */
+function tone(freqs, dur, vol, type){
+  if (!soundOn || !audioCtx) return;
+  try {
+    var t0 = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var amp = audioCtx.createGain();
+    osc.type = type || 'triangle';
+    osc.frequency.setValueAtTime(freqs[0], t0);
+    if (freqs.length > 1) osc.frequency.exponentialRampToValueAtTime(freqs[1], t0 + dur * 0.7);
+    var v = CONFIG.soundVolume * (vol === undefined ? 1 : vol);
+    amp.gain.setValueAtTime(0.0001, t0);
+    amp.gain.exponentialRampToValueAtTime(v, t0 + 0.008);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(amp); amp.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  } catch (e) { /* 続ける */ }
+}
+
+window.playJudge = playJudge;
+window.carve = carve;
 
 /* =========================================================================
    チュートリアル（§19.7）
@@ -2239,6 +2484,40 @@ function courseMeters(){
   return G.finishD / CONFIG.pxPerMeter;
 }
 
+/* TOTAL をゼロから数え上げる（§20.7）。
+   ★数字が増えていく時間は 1 秒未満にする。長いと「見せられている」感じになる */
+var totalAnimId = null;
+function countUpTotal(target){
+  var el  = document.getElementById('resTotal');
+  var tag = document.getElementById('resMaxTag');
+  var mx  = currentMaxScore().total;
+  var isMax = target >= mx - 0.05;                       // この構成の上限に届いた
+
+  el.classList.remove('pop');
+  el.classList.toggle('max', isMax);
+  tag.textContent = isMax ? 'CURRENT MAX' : '';
+
+  if (totalAnimId) cancelAnimationFrame(totalAnimId);
+  var dur = 900, t0 = performance.now();
+  function step(now){
+    var t = clamp((now - t0) / dur, 0, 1);
+    var e = 1 - Math.pow(1 - t, 3);                      // 終わりへ向けてゆっくり止まる
+    el.textContent = (target * e).toFixed(2);
+    if (t < 1) { totalAnimId = requestAnimationFrame(step); }
+    else {
+      totalAnimId = null;
+      el.textContent = target.toFixed(2);
+      el.classList.add('pop');                           // 止まった瞬間に一度だけ跳ねる
+      setTimeout(function(){ el.classList.remove('pop'); }, 170);
+      if (isMax && soundOn && audioCtx) {
+        tone([1320], 0.10, 0.8, 'triangle');
+        setTimeout(function(){ tone([1760], 0.26, 0.9, 'triangle'); }, 110);
+      }
+    }
+  }
+  totalAnimId = requestAnimationFrame(step);
+}
+
 function showResult(){
   var s = G.score;
   if (!s) return;
@@ -2263,7 +2542,7 @@ function showResult(){
   var elPb = document.getElementById('resPb');
   elPb.textContent = pb.text;
   elPb.classList.toggle('sub', !!pb.sub);
-  document.getElementById('resTotal').textContent     = s.totalScore.toFixed(2);
+  countUpTotal(s.totalScore);                          // §20.3 カウントアップ
   document.getElementById('resTotalMax').textContent  = CONFIG.totalScoreMax;
   document.getElementById('resAirScore').textContent  = s.airScore.toFixed(2);
   document.getElementById('resTimeScore').textContent = s.timeScore.toFixed(1);
@@ -2406,6 +2685,7 @@ function update(now){
   p.x += (p.targetX - p.x) * k;
   p.sway *= Math.exp(-CONFIG.swayDecay * dt);
   p.pop = Math.max(0, p.pop - dt);
+  p.poleT = Math.max(0, p.poleT - dt);       // ストックを戻す（§20.4）
 
   // セット成立時はニュートラル（中央）へ戻す（§17.3.2）。NO SET のときは振れたまま
   var ar = activeAir(G.playerD);
@@ -2510,8 +2790,24 @@ function render(){
   ctx.moveTo(cx - hwTop, 0); ctx.lineTo(cx + hwTop, 0);
   ctx.lineTo(cx + hwBot, H); ctx.lineTo(cx - hwBot, H);
   ctx.closePath();
-  ctx.fillStyle = '#ffffff';
+  // 奥ほど冷たく沈ませる（§20.5）。一様な白だと斜面の奥行きが出ない
+  var cg = ctx.createLinearGradient(0, 0, 0, H);
+  cg.addColorStop(0,    '#e6eef6');
+  cg.addColorStop(0.42, '#f7fbff');
+  cg.addColorStop(1,    '#ffffff');
+  ctx.fillStyle = cg;
   ctx.fill();
+  // 左右の端を落として、平らな帯ではなく丸みのある斜面に見せる
+  ctx.save();
+  ctx.clip();
+  var sg2 = ctx.createLinearGradient(cx - hwBot, 0, cx + hwBot, 0);
+  sg2.addColorStop(0,    'rgba(150,180,208,.30)');
+  sg2.addColorStop(0.24, 'rgba(150,180,208,0)');
+  sg2.addColorStop(0.76, 'rgba(150,180,208,0)');
+  sg2.addColorStop(1,    'rgba(150,180,208,.30)');
+  ctx.fillStyle = sg2;
+  ctx.fillRect(cx - hwBot, 0, hwBot * 2, H);
+  ctx.restore();
 
   // 雪面の粒（速度感）
   ctx.fillStyle = 'rgba(150,178,203,.55)';
@@ -2877,7 +3173,7 @@ function drawPlayer(cx, judgeY){
   var torsoX = p.line + swing * (fixed ? CONFIG.torsoFollow : 1);
 
   // --- AIR（§17.3）---
-  var air = activeAir(G.playerD), airH = 0, tkPose = 0;
+  var air = activeAir(G.playerD), airH = 0, tkPose = 0, airTuck = 0;
   if (air) {
     if (air.stage === 'takeoff') {
       var tk = clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1);
@@ -2891,6 +3187,16 @@ function drawPlayer(cx, judgeY){
     } else if (air.stage === 'flight') {
       airH = Math.sin(Math.PI * clamp(air.u, 0, 1)) * CONFIG.airMaxHeight;
     }
+  }
+
+  // ★空中では体を一本の剛体にする（§20.8）。
+  //   地面の上では「足が大きく振れ、腰は half、上体はほとんど動かない」（§13.1）が、
+  //   空中は地面からの力が無いので脚は体の下に戻る。ここを直さないと、
+  //   足だけ横にずれた「ねじれた絵」が回転するので、技が雑に見える
+  if (airH > 0.5) {
+    var rigid = clamp(airH / 6, 0, 1);
+    footX += (torsoX - footX) * rigid;
+    hipX  += (torsoX - hipX)  * rigid;
   }
 
   var footY = 8;
@@ -2907,7 +3213,7 @@ function drawPlayer(cx, judgeY){
   var shSc = 1 - hR * 0.45;
   ctx.fillStyle = 'rgba(90,120,150,' + (0.26 * (1 - hR * 0.45)).toFixed(3) + ')';
   ctx.beginPath();
-  ctx.ellipse(footX, 20, 17 * shSc, 5 * shSc, 0, 0, Math.PI * 2);
+  ctx.ellipse(footX, 24, 20 * shSc, 5.5 * shSc, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // 空中の姿勢。影は地面に残したまま、選手だけ持ち上げて回す
@@ -2919,11 +3225,23 @@ function drawPlayer(cx, judgeY){
     var flipT = Math.round(flipA / (Math.PI * 2)) * Math.PI * 2;   // 一番近い「回り切った」姿勢
     var yawA  = air.rot * spin.yaw * Math.PI * 2;
     var sx    = Math.cos(yawA);
-    if (Math.abs(sx) < 0.22) sx = sx < 0 ? -0.22 : 0.22;
+    // ★真横を向いたときに 0 に近づけない。線になって「絵が潰れた」ように見える。
+    //   実際の体は横から見ても肩と板のぶんの厚みがある（§20.8）
+    if (Math.abs(sx) < 0.42) sx = sx < 0 ? -0.42 : 0.42;
+
+    // ★体をたたむ量（§20.8）。踏切で素早くたたみ、着地に向けて開く。
+    //   腕とストックの位置に使う。回すだけの絵と、たたんで回る体の差はここで出る
+    airTuck = Math.sin(Math.PI * clamp(air.u, 0, 1)) * (1 - open);
+    airTuck = clamp(airTuck, 0, 1);
+
+    // ★斜めの軸で回る体は、真後ろから見ると傾きが左右に振れる
+    var lean = (spin.tilt + spin.wob * Math.cos(yawA)) * (1 - open);
+
     ctx.translate(footX, footY - airH);
-    ctx.scale(1 + hR * 0.18, 1 + hR * 0.18);
-    ctx.rotate(spin.tilt * (1 - open) + flipA + (flipT - flipA) * open);
-    ctx.scale(sx + (1 - sx) * open, 1);
+    ctx.scale(1 + hR * 0.10, 1 + hR * 0.10);           // 手前に来るぶんだけ大きく
+    ctx.rotate(lean + flipA + (flipT - flipA) * open);
+    // 体の軸で縦に伸ばす（たたむと縮む）。回したあとに掛けるので体基準になる
+    ctx.scale(sx + (1 - sx) * open, 1 - airTuck * 0.10);
     ctx.translate(-footX, -footY);
   } else if (air && air.landLeanT > 0) {
     // 着地姿勢：早い＝後傾／遅い＝前傾（§17.4）
@@ -2942,62 +3260,163 @@ function drawPlayer(cx, judgeY){
     ctx.translate(-footX, -footY);
   }
 
-  // スキー（ターン方向へエッジング）
+  /* ---- ここから見た目（§20.4 / STEP 8）----------------------------------
+     ★姿勢の計算（footX / hipX / torsoX / hipY / shoY / headY / p.lean / p.comp）は
+       STEP 1〜7 のまま。ここで変えているのは「その骨組みに何を着せるか」だけ。
+       判定・採点には一切関係しない。 */
+  var W = CONFIG.wear;
+
+  // 1. スキー（ターン方向へエッジング）。上面が見える角度なので、天面を明るい色で乗せる
   ctx.save();
   ctx.translate(footX, footY);
   ctx.rotate(p.lean * CONFIG.edgeAngle);
-  ctx.fillStyle = '#12304d';
-  roundRect(-11.5, -14, 6.5, 30, 3); ctx.fill();
-  roundRect(5, -14, 6.5, 30, 3);     ctx.fill();
+  for (var sk = -1; sk <= 1; sk += 2) {
+    var sxc = sk * CONFIG.skiGap;             // 板の中心。★モーグルは板を閉じて滑る
+    ctx.fillStyle = W.ski;
+    skiPath(sxc, -13, 6.4, 45);               // ブーツより下（進行方向）を長く見せる
+    ctx.fill();
+    ctx.fillStyle = W.skiTop;                 // 上面（見えている側）を細く乗せる
+    skiPath(sxc, -11.5, 2.8, 41);
+    ctx.fill();
+  }
   ctx.restore();
 
-  // 脚（腰→膝→ブーツ）。吸収すると膝が外へ開いて持ち上がる＝畳んでいるのが見える
+  // 2. 脚（腰→膝→ブーツ）。吸収すると膝が外へ開いて持ち上がる＝畳んでいるのが見える。
+  //    線ではなく太さのある帯にして、外側に明るい面を入れる
   var kneeT = 0.52;
   var kneeLift = Math.max(0, p.comp) * (CONFIG.absorbEnabled ? 1 : 0);
-  ctx.strokeStyle = '#12304d';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 6.5;
   for (var li = -1; li <= 1; li += 2) {
-    var hx = hipX + li * 4,   hy = hipY;
-    var bx = footX + li * 5.5, by = footY - 2;
+    var hx = hipX + li * CONFIG.legGap,  hy = hipY;
+    var bx = footX + li * CONFIG.footGap, by = footY - 3;
     var kx = hx + (bx - hx) * kneeT + li * kneeLift * CONFIG.kneeOut;
     var ky = hy + (by - hy) * kneeT - kneeLift * CONFIG.kneeUp;
+    // ★白いウェアは雪に溶けるので、輪郭 → 本体 → 影側 の順で重ねる
+    ctx.strokeStyle = W.pantsLine; ctx.lineWidth = 12.4;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.strokeStyle = W.pants;     ctx.lineWidth = 8.6;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.strokeStyle = W.pantsShade; ctx.lineWidth = 3.2;   // 内側に落ちる影
     ctx.beginPath();
-    ctx.moveTo(hx, hy);
-    ctx.lineTo(kx, ky);
-    ctx.lineTo(bx, by);
+    ctx.moveTo(hx - li * 2.0, hy + 1); ctx.lineTo(kx - li * 2.2, ky); ctx.lineTo(bx - li * 1.8, by - 1);
     ctx.stroke();
   }
 
-  // 上体（フォールラインを向いたまま）
-  ctx.fillStyle = '#e8402f';
+  // 2b. ブーツ。★脚より後に描く。先に描くと脚に隠れて板と脚が切れて見える
+  ctx.save();
+  ctx.translate(footX, footY);
+  ctx.rotate(p.lean * CONFIG.edgeAngle);
+  ctx.fillStyle = W.boot;
+  var bw = 6.0, bg = CONFIG.skiGap;
+  roundRect(-bg - bw / 2, -6.0, bw, 10.5, 2.4); ctx.fill();
+  roundRect( bg - bw / 2, -6.0, bw, 10.5, 2.4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.18)';               // 甲に当たる光
+  roundRect(-bg - bw / 2 + 0.8, -5.2, bw - 1.6, 3.0, 1.2); ctx.fill();
+  roundRect( bg - bw / 2 + 0.8, -5.2, bw - 1.6, 3.0, 1.2); ctx.fill();
+  ctx.restore();
+
+  // 3. 上体（フォールラインを向いたまま）。肩から腰へ少し絞る
+  var shoW = 10.2, hipW = 7.8;
+  ctx.fillStyle = W.jacket;
   ctx.beginPath();
-  ctx.moveTo(torsoX - 9.5, shoY);
-  ctx.lineTo(torsoX + 9.5, shoY);
-  ctx.lineTo(hipX + 7.5, hipY + 1);
-  ctx.lineTo(hipX - 7.5, hipY + 1);
+  ctx.moveTo(torsoX - shoW, shoY);
+  ctx.quadraticCurveTo(torsoX, shoY - 2.4, torsoX + shoW, shoY);
+  ctx.lineTo(hipX + hipW, hipY + 1);
+  ctx.quadraticCurveTo(hipX, hipY + 3.0, hipX - hipW, hipY + 1);
   ctx.closePath();
   ctx.fill();
-
-  // 腕・ストック（前に構える）
-  ctx.strokeStyle = '#0d1b2a';
-  ctx.lineWidth = 2.2;
+  // 肩の影側（右から見て左肩に落ちる）。平らな面に見えないように 1 枚だけ足す
+  ctx.fillStyle = W.jacketDark;
   ctx.beginPath();
-  ctx.moveTo(torsoX - 9, shoY + 3); ctx.lineTo(torsoX - 20, shoY + 15);
-  ctx.moveTo(torsoX + 9, shoY + 3); ctx.lineTo(torsoX + 20, shoY + 15);
-  ctx.stroke();
+  ctx.moveTo(torsoX - shoW, shoY);
+  ctx.quadraticCurveTo(torsoX - shoW * 0.35, shoY - 1.6, torsoX - shoW * 0.10, shoY - 0.4);
+  ctx.lineTo(hipX - hipW * 0.20, hipY + 2);
+  ctx.lineTo(hipX - hipW, hipY + 1);
+  ctx.closePath();
+  ctx.fill();
+  // ゼッケン（前面の白。上体の向きが読めるようになる）
+  ctx.fillStyle = W.bib;
+  ctx.globalAlpha = 0.85;
+  roundRect(torsoX - 3.2, shoY + 6.0, 6.4, 7.0, 1.5); ctx.fill();
+  ctx.globalAlpha = 1;
 
-  // 頭
-  ctx.fillStyle = '#12304d';
+  // 4. 腕・ストック。モーグルらしさはここが一番効く。
+  //    ★タップした側のストックを突く（§20.4）。突いた直後が一番深く、戻りながら上がる
+  var plant = 0, plantSide = 0;
+  if (p.poleT > 0 && CONFIG.polePlantTime > 0) {
+    var pt = p.poleT / CONFIG.polePlantTime;      // 1 → 0
+    plant = pt * pt;                              // 突いた瞬間が最大。戻りはゆっくり
+    plantSide = p.poleSide;
+  }
+  for (var ai = -1; ai <= 1; ai += 2) {
+    var on   = (ai === plantSide) ? plant : 0;
+    var handX = torsoX + ai * (15.0 + on * CONFIG.polePlantOut);
+    var handY = shoY + 12.5 - on * 2.0;           // 突くときは手が少し上がる
+    var tipX  = torsoX + ai * (27.0 + on * 6.0);
+    var tipY  = shoY + 33.0 + on * CONFIG.polePlantDrop;
+    // ★空中では腕を胸に引きつけ、ストックを前で交差させる（§20.8）
+    if (airTuck > 0.001) {
+      var k = airTuck;
+      handX += (torsoX + ai * 6.5  - handX) * k;
+      handY += (shoY + 8.5         - handY) * k;
+      tipX  += (torsoX - ai * 6.0  - tipX)  * k;   // 反対側へ少し回してクロスさせる
+      tipY  += (shoY + 24.0        - tipY)  * k;
+    }
+    // 腕
+    ctx.strokeStyle = W.jacket; ctx.lineWidth = 4.2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(torsoX + ai * shoW * 0.82, shoY + 2.5); ctx.lineTo(handX, handY);
+    ctx.stroke();
+    // ストック
+    ctx.strokeStyle = W.pole; ctx.lineWidth = 2.1;
+    ctx.beginPath(); ctx.moveTo(handX, handY - 2.0); ctx.lineTo(tipX, tipY); ctx.stroke();
+    // バスケット
+    ctx.fillStyle = W.pole;
+    var bkX = handX + (tipX - handX) * 0.88, bkY = handY - 2.0 + (tipY - (handY - 2.0)) * 0.88;
+    ctx.beginPath(); ctx.ellipse(bkX, bkY, 3.2, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+    // 突いた雪の跡（石突きのまわりに白い輪）
+    if (on > 0.15) {
+      ctx.strokeStyle = 'rgba(120,160,200,' + (on * 0.75).toFixed(3) + ')';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.ellipse(tipX, tipY, 5.5 + (1 - on) * 9, 2.0 + (1 - on) * 3.0, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // 5. 頭（ヘルメット＋ゴーグル）
+  ctx.fillStyle = W.helmet;
   ctx.beginPath();
-  ctx.arc(torsoX, headY, 6, 0, Math.PI * 2);
+  ctx.ellipse(torsoX, headY, 6.4, 6.0, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = W.goggle;                                            // ゴーグルの帯
+  roundRect(torsoX - 6.2, headY - 1.6, 12.4, 3.4, 1.4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.30)';                             // ヘルメットの艶
+  ctx.beginPath();
+  ctx.ellipse(torsoX - 2.2, headY - 3.4, 2.6, 1.5, -0.5, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();   // 転倒の回転
   ctx.restore();   // 空中／着地姿勢
   ctx.restore();
 }
+/* 板の形。★先端（トップ）は画面の下＝進行方向。上はテールで角丸。
+   選手は画面の下へ向かって滑っているので、とがった側を下にしないと逆向きに見える */
+function skiPath(cx, top, w, h){
+  var hw = w / 2, bot = top + h;
+  ctx.beginPath();
+  ctx.moveTo(cx, bot);                                        // トップ（先端・下）
+  ctx.quadraticCurveTo(cx - hw, bot - h * 0.16, cx - hw, bot - h * 0.34);
+  ctx.lineTo(cx - hw, top + hw * 0.8);
+  ctx.quadraticCurveTo(cx - hw, top, cx - hw * 0.35, top);    // テール（上・角丸）
+  ctx.lineTo(cx + hw * 0.35, top);
+  ctx.quadraticCurveTo(cx + hw, top, cx + hw, top + hw * 0.8);
+  ctx.lineTo(cx + hw, bot - h * 0.34);
+  ctx.quadraticCurveTo(cx + hw, bot - h * 0.16, cx, bot);
+  ctx.closePath();
+}
+
 function roundRect(x, y, w, h, r){
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -3188,7 +3607,58 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
+/* =========================================================================
+   §21 スポンサー枠
+   タイトル画面とリザルト画面にだけ出す。どちらも「止まって眺める画面」なので
+   邪魔にならず、露出としてはいちばん効く。
+   ★ゲーム画面には出さない。画面の左右半分がターン入力のタップ領域で、
+     バナーを置くと誤タップを誘発する。滑走中は視線がコブに固定されるので
+     露出効果もほぼ無く、操作性を落とすだけになる（§19.1 の縦幅の話とも衝突する）。
+   ========================================================================= */
+function spEsc(t){
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function sponsorSlotHtml(s){
+  // img が入っていれば実ロゴ、無ければ空き枠。判定はここ一箇所だけ
+  if (s && s.img) {
+    return '<div class="spSlot filled"><img src="' + spEsc(s.img) +
+           '" alt="' + spEsc(s.alt || s.name || '') + '"></div>';
+  }
+  return '<div class="spSlot empty">' +
+         '<div class="spK">' + spEsc(CONFIG.sponsorWanted) + '</div>' +
+         '<div class="spV">' + spEsc(CONFIG.sponsorNote)   + '</div></div>';
+}
+function renderSponsors(){
+  var bands = document.querySelectorAll('.spBand');
+  var list  = CONFIG.sponsors || [];
+  var n     = Math.max(CONFIG.sponsorSlots || 0, list.length);
+  var on    = !!CONFIG.sponsorsOn && n > 0;
+  var row = '', filled = false, i;
+  for (i = 0; i < n; i++) {
+    if (list[i] && list[i].img) filled = true;
+    row += sponsorSlotHtml(list[i]);
+  }
+  var html = '<div class="spLbl">' +
+             spEsc(filled ? CONFIG.sponsorLabel : CONFIG.sponsorLabelEmpty) +
+             '</div><div class="spRow">' + row + '</div>';
+  for (i = 0; i < bands.length; i++) {
+    bands[i].classList.toggle('hidden', !on);
+    bands[i].innerHTML = on ? html : '';
+  }
+}
+
+window.renderSponsors = renderSponsors;
+
 resize();
+renderSponsors();
+// 判定音（§20.6）。前回の設定を読み、ボタンの表示を合わせる
+soundOn = soundLoadPref();
+document.getElementById('btnSound').textContent = '♪ ' + (soundOn ? 'ON' : 'OFF');
+document.getElementById('btnStart').addEventListener('click', soundUnlock);
+document.getElementById('btnRetry').addEventListener('click', soundUnlock);
+
 // デバッグ用の表示とボタンは ?debug=1 のときだけ（§19.6）
 elDebug.classList.toggle('hidden', !showDebug);
 if (!debugMode) {
