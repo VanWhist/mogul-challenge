@@ -218,7 +218,7 @@
   .resTimeV{font-size:30px;font-weight:900;line-height:1.1;margin-bottom:12px;}
   .resScoreV{font-size:44px;font-weight:900;line-height:1;color:#7fe0b0;}
   .resScoreMax{font-size:13px;color:#8fb4d4;font-weight:700;}
-  .resSec{margin-top:14px;border-top:1px solid rgba(143,180,212,.28);padding-top:9px;}
+  .resSec{margin-top:11px;border-top:1px solid rgba(143,180,212,.28);padding-top:7px;}
   .resRow{display:flex;justify-content:space-between;align-items:baseline;
     font-size:11px;line-height:1.9;}
   .resRow .rk{color:#b9d2e6;}
@@ -226,7 +226,7 @@
   .resRow .rp{color:#7fb2dd;font-size:10px;min-width:52px;text-align:right;}
   .resSmall{font-size:10px;color:#8fb4d4;line-height:1.8;margin-top:6px;}
   .resNote{font-size:9px;color:#5f88ab;margin-top:10px;letter-spacing:.06em;}
-  .resSecTitle{font-size:9px;letter-spacing:.16em;color:#5f88ab;margin-top:12px;text-align:left;}
+  .resSecTitle{font-size:9px;letter-spacing:.16em;color:#5f88ab;margin-top:10px;text-align:left;}
   /* 縦の短い画面ではリザルトを詰める。RETRY をスクロールなしで押せるようにするため（§19.1）*/
   #stage.shortres .ovTitle{font-size:17px;margin-bottom:2px;}
   #stage.shortres .resScoreV{font-size:32px;}
@@ -243,6 +243,42 @@
   #stage.shortres .resNote{margin-top:4px;font-size:8.5px;}
   #stage.shortres #resPb{margin-top:3px;font-size:10px;}
   #stage.shortres .rankRow{line-height:1.7;}
+  /* --- リザルトの 3 カラム帯（§20.9）---
+     TURNS / AIR / TIME の配点と達成度を、実際のモーグルのリザルトと同じ並びで見せる */
+  #scoreBand{display:flex;width:100%;margin-top:13px;border:1px solid rgba(143,180,212,.30);
+    border-radius:10px;overflow:hidden;}
+  .sbCell{flex:1 1 0;min-width:0;text-align:center;padding:8px 4px 8px;
+    border-right:1px solid rgba(143,180,212,.22);}
+  .sbCell:last-child{border-right:0;}
+  .sbK{font-size:8.5px;letter-spacing:.2em;color:#8fb4d4;}
+  .sbV{font-size:25px;font-weight:900;line-height:1.05;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .sbM{font-size:8.5px;color:#5f88ab;margin-top:1px;}
+  .sbBar{height:3px;border-radius:2px;background:rgba(143,180,212,.20);margin:6px 8px 0;overflow:hidden;}
+  .sbBar i{display:block;height:100%;width:0%;border-radius:2px;transition:width .5s ease-out;}
+  .c-turn .sbV{color:#7fd6ff;} .c-turn .sbBar i{background:#3fa9ff;}
+  .c-air  .sbV{color:#9be7c4;} .c-air  .sbBar i{background:#2fa36b;}
+  .c-time .sbV{color:#ffd479;} .c-time .sbBar i{background:#e0a33a;}
+  /* 見出しの右に「その区分の合計 / 配点」を出す */
+  .resSecTitle{display:flex;justify-content:space-between;align-items:baseline;}
+  .resSecTitle b{color:#b9d2e6;font-size:9px;letter-spacing:.10em;font-variant-numeric:tabular-nums;}
+  /* エアの内訳表（JUMP / DD / Q / SCORE）*/
+  #resAirTable{width:100%;border-collapse:collapse;font-size:10.5px;}
+  #resAirTable th{font-size:8px;letter-spacing:.12em;color:#5f88ab;font-weight:400;
+    padding:0 0 3px;text-align:right;}
+  #resAirTable th:first-child,#resAirTable td:first-child{text-align:left;}
+  #resAirTable td{padding:3px 0;border-top:1px solid rgba(143,180,212,.14);
+    font-variant-numeric:tabular-nums;text-align:right;color:#b9d2e6;}
+  #resAirTable .nm{color:#eaf3fb;font-weight:700;}
+  #resAirTable .sc{font-weight:900;color:#9be7c4;}
+  #resAirTable .no{color:#e0a33a;font-weight:700;}
+  /* 表と注記の左端をそろえる（注記だけ中央寄せだと表からずれて見える） */
+  #resAir{text-align:left;}
+  .resRow.minus .rv{color:#e08a7a;}
+  #stage.shortres #scoreBand{margin-top:9px;}
+  #stage.shortres .sbCell{padding:6px 4px;}
+  #stage.shortres .sbV{font-size:21px;}
+  #stage.shortres #resAirTable td{padding:2px 0;}
+
   /* --- スポンサー枠（§21）---
      タイトル画面とリザルト画面にだけ出す。ゲーム画面には出さない。
      ★空き枠（SPONSOR WANTED）は営業用の見本を兼ねる。実在企業のロゴは
@@ -465,14 +501,22 @@
       <div><span class="resScoreV" id="resTotal">0.00</span><span class="resScoreMax"> / <span id="resTotalMax">100</span></span></div>
       <div id="resMaxTag"></div>
       <div id="resPb"></div>
-      <div class="resSec">
-        <div class="resRow"><span class="rk">TURN</span><span class="rv" id="resScore">0.0</span><span class="rp">/ 60</span></div>
-        <div class="resRow"><span class="rk">AIR</span><span class="rv" id="resAirScore">0.0</span><span class="rp">/ 20</span></div>
-        <div class="resRow"><span class="rk">TIME <em style="color:#5f88ab" id="resTime">0.00</em>s</span>
-          <span class="rv" id="resTimeScore">0.0</span><span class="rp">/ 20</span></div>
+      <div id="scoreBand">
+        <div class="sbCell c-turn"><div class="sbK">TURNS</div>
+          <div class="sbV" id="resScore">0.0</div>
+          <div class="sbM">配点 <span id="sbMaxTurn">60</span></div>
+          <div class="sbBar"><i id="sbBarTurn"></i></div></div>
+        <div class="sbCell c-air"><div class="sbK">AIR</div>
+          <div class="sbV" id="resAirScore">0.0</div>
+          <div class="sbM">配点 <span id="sbMaxAir">20</span></div>
+          <div class="sbBar"><i id="sbBarAir"></i></div></div>
+        <div class="sbCell c-time"><div class="sbK">TIME</div>
+          <div class="sbV" id="resTimeScore">0.0</div>
+          <div class="sbM">配点 <span id="sbMaxTime">20</span></div>
+          <div class="sbBar"><i id="sbBarTime"></i></div></div>
       </div>
-      <div class="resSecTitle">TURN の内訳</div>
 
+      <div class="resSecTitle">TURN の内訳<b id="resTurnSum"></b></div>
       <div class="resSec">
         <div class="resRow"><span class="rk">カービング <em style="color:#5f88ab">50%</em></span>
           <span class="rv" id="resCarve">0.00</span><span class="rp" id="resCarveP">0.0</span></div>
@@ -480,15 +524,28 @@
           <span class="rv" id="resAbsorb">0.00</span><span class="rp" id="resAbsorbP">0.0</span></div>
         <div class="resRow"><span class="rk">上体 <em style="color:#5f88ab">25%</em></span>
           <span class="rv" id="resUpper">0.00</span><span class="rp" id="resUpperP">0.0</span></div>
-        <div class="resRow"><span class="rk">基礎点</span><span class="rv" id="resBase">0.0</span><span class="rp"></span></div>
-        <div class="resRow"><span class="rk">減点（転倒 <span id="resFalls">0</span>）</span>
+        <div class="resRow"><span class="rk">BASE SCORE</span>
+          <span class="rv" id="resBase">0.0</span><span class="rp"></span></div>
+        <div class="resRow minus"><span class="rk">DEDUCTION
+          <em style="color:#5f88ab">転倒 <span id="resFalls">0</span></em></span>
           <span class="rv" id="resPenalty">0.0</span><span class="rp"></span></div>
       </div>
 
-      <div class="resSecTitle">AIR の内訳</div>
+      <div class="resSecTitle">AIR の内訳<b id="resAirSum"></b></div>
       <div class="resSec">
+        <table id="resAirTable">
+          <thead><tr><th>JUMP</th><th>DD</th><th>Q</th><th>SCORE</th></tr></thead>
+          <tbody id="resAirBody"></tbody>
+        </table>
         <div class="resSmall" id="resAir"></div>
         <div class="resSmall" id="resRepeat"></div>
+      </div>
+
+      <div class="resSecTitle">TIME<b id="resTimeSum"></b></div>
+      <div class="resSec">
+        <div class="resRow"><span class="rk"><em style="color:#b9d2e6;font-style:normal"
+          id="resTime">0.00</em> s（PACE <span id="resPace">0.00</span> s）</span>
+          <span class="rv" id="resTimeCalc">0.0</span><span class="rp"></span></div>
       </div>
 
       <div class="resSec">
@@ -501,7 +558,7 @@
         <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
       </div>
       <div class="spBand" id="spResult"></div>
-      <div class="resNote">TURN 60 ＋ AIR 20 ＋ TIME 20 ＝ 100（現在の技での最大は 97.6）</div>
+      <div class="resNote" id="resFormula"></div>
     </div>
   </div>
 </div>
@@ -2534,7 +2591,7 @@ function showResult(){
   document.getElementById('resUpper').textContent   = s.upper.toFixed(2);
   document.getElementById('resUpperP').textContent  = f1(s.upperPts);
   document.getElementById('resBase').textContent    = f1(s.base);
-  document.getElementById('resPenalty').textContent = s.penalty > 0 ? '−' + f1(s.penalty) : '0.0';
+  document.getElementById('resPenalty').textContent = s.penalty > 0 ? '−' + f1(s.penalty) : '−0.0';
   document.getElementById('resFalls').textContent   =
     s.falls + (s.airFalls ? ' ＋ エア ' + s.airFalls + '×' + CONFIG.airFallWeight : '');
   // TOTAL / AIR / TIME（§18.3〜18.5）。★100 に正規化しない
@@ -2544,22 +2601,53 @@ function showResult(){
   elPb.classList.toggle('sub', !!pb.sub);
   countUpTotal(s.totalScore);                          // §20.3 カウントアップ
   document.getElementById('resTotalMax').textContent  = CONFIG.totalScoreMax;
-  document.getElementById('resAirScore').textContent  = s.airScore.toFixed(2);
+  document.getElementById('resAirScore').textContent  = s.airScore.toFixed(1);
   document.getElementById('resTimeScore').textContent = s.timeScore.toFixed(1);
-  // AIR の内訳（§18.3）。リピートでカウントされなかった本数が読めるようにする
+
+  // --- 3 カラム帯（§20.9）。配点も達成度も CONFIG から出す。数値をハードコードしない ---
+  var band = [
+    ['sbMaxTurn', 'sbBarTurn', s.total,     CONFIG.turnScoreMax],
+    ['sbMaxAir',  'sbBarAir',  s.airScore,  CONFIG.airScoreMax],
+    ['sbMaxTime', 'sbBarTime', s.timeScore, CONFIG.timeScoreMax]
+  ];
+  for (var bi = 0; bi < band.length; bi++) {
+    var mx = band[bi][3];
+    document.getElementById(band[bi][0]).textContent = mx;
+    document.getElementById(band[bi][1]).style.width =
+      (mx > 0 ? clamp(band[bi][2] / mx, 0, 1) * 100 : 0).toFixed(1) + '%';
+  }
+  document.getElementById('resTurnSum').textContent =
+    f1(s.total) + ' / ' + CONFIG.turnScoreMax;
+  document.getElementById('resAirSum').textContent =
+    s.airScore.toFixed(2) + ' / ' + CONFIG.airScoreMax;
+  document.getElementById('resTimeSum').textContent =
+    s.timeScore.toFixed(2) + ' / ' + CONFIG.timeScoreMax;
+
+  // --- TIME（§18.4）。点数だけでなく、何と比べた結果なのかが読めるようにする ---
+  document.getElementById('resPace').textContent     = paceTimeSec().toFixed(2);
+  document.getElementById('resTimeCalc').textContent = s.timeScore.toFixed(2);
+  // AIR の内訳（§18.3 / §20.9）。表は「DD × Q = SCORE」だけに絞り、
+  // セット・着地ずれ・判定ラベルは下の注記に回す。滑り終わった直後に読める量にするため
+  document.getElementById('resAirBody').innerHTML = s.airs.map(function(a){
+    var q  = a.quality === null ? '—' : a.quality.toFixed(1);
+    var sc = a.counted
+      ? (a.value === null || a.value === undefined ? '0.00' : a.value.toFixed(2))
+      : 'REPEAT';
+    return '<tr><td class="nm">AIR ' + a.index + '　' + a.label + '</td>' +
+           '<td>' + a.dd.toFixed(2) + '</td><td>' + q + '</td>' +
+           '<td class="' + (a.counted ? 'sc' : 'no') + '">' + sc + '</td></tr>';
+  }).join('');
+  // ★1 本を 1 行に収める。折り返すとリザルトが 2 行ぶん伸びて RETRY が押しにくくなる（§19.1）
   document.getElementById('resAir').innerHTML = s.airs.map(function(a){
-    return 'AIR ' + a.index + ': ' + a.label +
-      (a.counted ? '' : '　<b>［リピート：カウントなし］</b>') +
-      (a.result ? '　' + AIR_RESULT[a.result].label : '　未通過') +
-      (a.setResult ? '　/　' + SET_LABEL[a.setResult] +
-         (a.setDeltaM === null ? '（無入力）'
-          : '（' + (a.setDeltaM >= 0 ? '+' : '') + a.setDeltaM.toFixed(2) + 'm）') : '') +
+    var land = a.result ? AIR_RESULT[a.result].label.replace(' LANDING', '') : '未通過';
+    return 'AIR ' + a.index + '　' + land +
+      (a.setResult ? ' / ' + SET_LABEL[a.setResult].replace(' SET', '') +
+         (a.setDeltaM === null ? '' :
+          ' ' + (a.setDeltaM >= 0 ? '+' : '') + a.setDeltaM.toFixed(2) + 'm') : '') +
       (a.quality === null ? '' :
-        '<br>　着地 Q ' + a.qualityLanding.toFixed(1) + ' × セット ' + a.setFactor.toFixed(2) +
-        ' = Q ' + a.quality.toFixed(1) + ' × DD ' + a.dd.toFixed(2) +
-        ' = <b>' + a.value.toFixed(2) + '</b>' +
-        (a.deltaMs === null ? '　（着地は無入力）'
-                            : '　着地ずれ ' + (a.deltaMs >= 0 ? '+' : '') + a.deltaMs.toFixed(0) + 'ms'));
+        '　Q ' + a.qualityLanding.toFixed(1) + '×' + a.setFactor.toFixed(2) +
+        (a.deltaMs === null ? ''
+                            : '　' + (a.deltaMs >= 0 ? '+' : '') + a.deltaMs.toFixed(0) + 'ms'));
   }).join('<br>');
   document.getElementById('resRepeat').innerHTML = s.repeated
     ? '同じ技を 2 本跳んだため、2 本目は AIR SCORE に加算されていません（FIS のリピート規定）' : '';
@@ -2572,6 +2660,12 @@ function showResult(){
     '判定合計 ' + (c.perfect + c.good + c.ok + c.miss + c.majorMiss) + ' / ' + s.mogulCount +
     '　つなぎ目 ' + s.linkSum.toFixed(1) + ' / ' + (s.mogulCount - 1) +
     '　平均BALANCE ' + s.avgBalance.toFixed(1);
+  // 配点の内訳と、いま選んでいる技での上限（§18.5）。★どちらもハードコードしない
+  var mxNow = currentMaxScore();
+  document.getElementById('resFormula').textContent =
+    'TURN ' + CONFIG.turnScoreMax + ' ＋ AIR ' + CONFIG.airScoreMax +
+    ' ＋ TIME ' + CONFIG.timeScoreMax + ' ＝ ' + CONFIG.totalScoreMax +
+    '（この構成の上限は ' + mxNow.total.toFixed(1) + '）';
   elResultOv.classList.remove('hidden');
 }
 
