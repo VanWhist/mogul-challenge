@@ -847,6 +847,9 @@ var CONFIG = {
   airLeanFall:           0.14,  // 回り切ってから体が立つまでの時間（同上）
   airArmSpread:          5.5,   // 空中で腕を横に開く量(px)。実写では腕は開いたまま
   airArmLift:            4.0,   // 空中で手が上がる量(px)
+  airPitchFloor:        0.30,   // 前後回転が真横のとき、体が線に潰れないための下限
+  airRaiseFade:         0.22,   // 踏切の「万歳」が下りるまで（回転の進みに対する割合）
+  airTuckLift:            16,   // 抱え込みで足が上がる量(px)
 
   // --- スポンサー枠（§21）---
   // ★ここは「データ」。コードにロゴを書かない。実ロゴを載せるときは
@@ -1233,11 +1236,22 @@ function checkAirCourseInvariant(moguls, zone, label){
    wob  = 回りながら見える傾きの揺れ（★v6.0）。
           真後ろから見ると、斜めの軸で回る体は「傾きが左右に振れて」見える。
           これを入れないと、絵が平面のまま回っているようにしか見えない（§20.8） */
+/* ★v6.4: 実機フィードバックで見直した。
+   arc = 体を片側だけへ倒す量(rad)。0 から arc まで行って戻る（反対側へは行かない）*/
 var AIR_SPIN = {
-  // ★v6.3: 実写のコマ送り（ウォータージャンプ 3 本）から見直した
-  '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.10 },  // 体は立てたまま。倒れない
-  'backFull': { flip: 1, yaw: 1, tilt: 0.08, wob: 0.18 },  // レイアウト（伸身）に近い
-  'cork720':  { flip: 1, yaw: 2, tilt: 0.60, wob: 0.30 }   // オフアクシス。踏切直後から体が倒れる
+  // 360：体を立てたまま縦軸で 1 回転。腕は開いたまま
+  '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.08, arc: 0.00,
+                armMode: 'spread' },
+  // ★バックフル（v6.4）：画面内で横に一周させない（＝カートホイールに見せない）。
+  //   縦軸で 1 捻り ＋「頭が真下に下がって戻る」前後回転を 1 回。
+  //   前後回転は pitchTurns で表す。真後ろから見た宙返りは、横に回るのではなく
+  //   体が縦に潰れて上下が入れ替わる形に見えるため
+  'backFull': { flip: 0, yaw: 1, tilt: 0.00, wob: 0.03, arc: 0.00,
+                pitchTurns: 1, armMode: 'side' },
+  // ★オフアクシス 720（v6.4）：時計の 12 時〜4 時の側だけを使う。左半分へは入れない。
+  //   途中で抱え込む（tuck）
+  'cork720':  { flip: 0, yaw: 2, tilt: 0.00, wob: 0.00, arc: 2.09,
+                armMode: 'spread', tuck: 1 }   // 2.09rad = 120° = 4 時
 };
 
 /* 回転の進み方（§20.8。★v6.3 で実写に合わせて作り直した）
@@ -3297,6 +3311,11 @@ function drawPlayer(cx, judgeY){
 
   // --- AIR（§17.3）---
   var air = activeAir(G.playerD), airH = 0, tkPose = 0, airSpread = 0;
+  // ★v6.4 空中の姿勢。踏切=万歳 → ピーク=腕を体側／抱え込み → 着地=通常
+  var airRaise = 0;      // 万歳（両腕を上げて体を伸ばす）
+  var airSide  = 0;      // 腕を体側に付ける（バックフル）
+  var airKnee  = 0;      // 抱え込み（オフアクシス 720）
+  var pitchSy  = 1;      // 前後回転の縦の潰れ（負なら上下が入れ替わる＝逆さ）
   if (air) {
     if (air.stage === 'takeoff') {
       var tk = clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1);
@@ -3307,6 +3326,7 @@ function drawPlayer(cx, judgeY){
         // セットできていない → 沈んだまま、振れた姿勢でリップを越える（§17.3.2）
         tkPose = CONFIG.absorbDepth * Math.min(1, tk / 0.5);
       }
+      airRaise = tk;                                   // ★踏切で万歳。リップで最大
     } else if (air.stage === 'flight') {
       airH = Math.sin(Math.PI * clamp(air.u, 0, 1)) * CONFIG.airMaxHeight;
     }
@@ -3344,9 +3364,14 @@ function drawPlayer(cx, judgeY){
   if (airH > 0.5) {
     var spin = AIR_SPIN[air.trick] || AIR_SPIN['360'];
     var open = air.openT;                              // タップ後、開いて上体を起こす
-    var flipA = air.rot * spin.flip * Math.PI * 2;
+    // ★v6.4: air.rot は「回った回数」（= ease × max(flip,yaw)）。
+    //   これをそのまま flip / yaw に掛けると二重に増えて、CORK 720 が
+    //   縦軸 4 回転・前後 2 回転になっていた。0〜1 の進み具合に直してから掛ける
+    var maxSpin = Math.max(spin.flip, spin.yaw) || 1;
+    var e     = clamp(air.rot / maxSpin, 0, 1);
+    var flipA = e * spin.flip * Math.PI * 2;
     var flipT = Math.round(flipA / (Math.PI * 2)) * Math.PI * 2;   // 一番近い「回り切った」姿勢
-    var yawA  = air.rot * spin.yaw * Math.PI * 2;
+    var yawA  = e * spin.yaw * Math.PI * 2;
     var sx    = Math.cos(yawA);
     // ★真横を向いたときに 0 に近づけない。線になって「絵が潰れた」ように見える。
     //   実際の体は横から見ても肩と板のぶんの厚みがある（§20.8）
@@ -3355,18 +3380,43 @@ function drawPlayer(cx, judgeY){
     // ★v6.3: 実写では腕とストックは「開いたまま」回っている。
     //   胸にたたむ動き（v6.0）は 3 本のどれにも出てこなかったので、開く方へ変えた。
     //   体も縮めない（バックフルはレイアウト＝伸身に近い）
-    airSpread = Math.sin(Math.PI * clamp(air.u, 0, 1)) * (1 - open);
+    // ★v6.4: 技ごとに腕の使い方を変える。バックフルはピークで腕を体側に付ける
+    var eArc = clamp(e, 0, 1);
+    var peak = Math.sin(Math.PI * eArc);
+    airSpread = (spin.armMode === 'side' ? 0 : peak) * (1 - open);
     airSpread = clamp(airSpread, 0, 1);
+    airSide   = (spin.armMode === 'side' ? peak : 0) * (1 - open);
+    airKnee   = (spin.tuck || 0) * Math.pow(peak, 1.3) * (1 - open);
+    // 万歳は回り始めると下ろす
+    airRaise  = Math.max(airRaise, clamp(1 - e / CONFIG.airRaiseFade, 0, 1)) * (1 - open);
+
+    // ★前後回転（バックフル）。真後ろから見た宙返りは横に回らず、
+    //   体が縦に潰れて上下が入れ替わる。cos が負になった区間が「逆さ」
+    if (spin.pitchTurns) {
+      var phi = e * spin.pitchTurns * Math.PI * 2;
+      pitchSy = Math.cos(phi);
+      var pf = CONFIG.airPitchFloor;                  // 真横で線に潰れないための下限
+      if (Math.abs(pitchSy) < pf) pitchSy = pitchSy < 0 ? -pf : pf;
+      pitchSy = pitchSy + (1 - pitchSy) * open;       // 着地入力で立て直す
+    }
 
     // ★斜めの軸で回る体は、真後ろから見ると傾きが左右に振れる
     // ★v6.3: 踏切と着地では体が立っている。傾きは回転と一緒に出入りさせる
-    var lean = (spin.tilt + spin.wob * Math.cos(yawA)) * airLeanRamp(air.u) * (1 - open);
+    // ★v6.4: arc は「片側だけへ倒れて戻る」動き。sin なので必ず 0 以上＝反対側へ入らない
+    var arcLean = (spin.arc || 0) * Math.sin(Math.PI * e);
+    var lean = (spin.tilt + spin.wob * Math.cos(yawA) + arcLean) *
+               airLeanRamp(air.u) * (1 - open);
 
     ctx.translate(footX, footY - airH);
     ctx.scale(1 + hR * 0.10, 1 + hR * 0.10);           // 手前に来るぶんだけ大きく
     ctx.rotate(lean + flipA + (flipT - flipA) * open);
     // 体の軸で縦に伸ばす（たたむと縮む）。回したあとに掛けるので体基準になる
     ctx.scale(sx + (1 - sx) * open, 1);          // ★縦に縮めない（伸身）
+    // ★前後回転は腰を軸に上下を入れ替える。足元を軸にすると頭が足より下へ大きく外れる
+    if (pitchSy !== 1) {
+      var pvy = hipY - footY;
+      ctx.translate(0, pvy); ctx.scale(1, pitchSy); ctx.translate(0, -pvy);
+    }
     ctx.translate(-footX, -footY);
   } else if (air && air.landLeanT > 0) {
     // 着地姿勢：早い＝後傾／遅い＝前傾（§17.4）
@@ -3390,10 +3440,12 @@ function drawPlayer(cx, judgeY){
        STEP 1〜7 のまま。ここで変えているのは「その骨組みに何を着せるか」だけ。
        判定・採点には一切関係しない。 */
   var W = CONFIG.wear;
+  // ★v6.4 抱え込み。板とブーツと脚だけを持ち上げる（腰から上はそのまま）
+  var footYd = footY - airKnee * CONFIG.airTuckLift;
 
   // 1. スキー（ターン方向へエッジング）。上面が見える角度なので、天面を明るい色で乗せる
   ctx.save();
-  ctx.translate(footX, footY);
+  ctx.translate(footX, footYd);
   ctx.rotate(p.lean * CONFIG.edgeAngle);
   for (var sk = -1; sk <= 1; sk += 2) {
     var sxc = sk * CONFIG.skiGap;             // 板の中心。★モーグルは板を閉じて滑る
@@ -3414,7 +3466,7 @@ function drawPlayer(cx, judgeY){
   ctx.lineJoin = 'round';
   for (var li = -1; li <= 1; li += 2) {
     var hx = hipX + li * CONFIG.legGap,  hy = hipY;
-    var bx = footX + li * CONFIG.footGap, by = footY - 3;
+    var bx = footX + li * CONFIG.footGap, by = footYd - 3;
     var kx = hx + (bx - hx) * kneeT + li * kneeLift * CONFIG.kneeOut;
     var ky = hy + (by - hy) * kneeT - kneeLift * CONFIG.kneeUp;
     // ★白いウェアは雪に溶けるので、輪郭 → 本体 → 影側 の順で重ねる
@@ -3430,7 +3482,7 @@ function drawPlayer(cx, judgeY){
 
   // 2b. ブーツ。★脚より後に描く。先に描くと脚に隠れて板と脚が切れて見える
   ctx.save();
-  ctx.translate(footX, footY);
+  ctx.translate(footX, footYd);
   ctx.rotate(p.lean * CONFIG.edgeAngle);
   ctx.fillStyle = W.boot;
   var bw = 6.0, bg = CONFIG.skiGap;
@@ -3487,6 +3539,22 @@ function drawPlayer(cx, judgeY){
       handY -= CONFIG.airArmLift * k;
       tipX  += ai * CONFIG.airArmSpread * 1.7 * k;
       tipY  -= CONFIG.airArmLift * 0.5 * k;
+    }
+    // ★v6.4 万歳（踏切）。両腕を上げて体を伸ばす
+    if (airRaise > 0.001) {
+      var r = airRaise;
+      handX += (torsoX + ai * 9.0  - handX) * r;
+      handY += (shoY - 15.0        - handY) * r;
+      tipX  += (torsoX + ai * 12.0 - tipX)  * r;
+      tipY  += (shoY - 40.0        - tipY)  * r;
+    }
+    // ★v6.4 腕を体側に付ける（バックフルのピーク）
+    if (airSide > 0.001) {
+      var sd = airSide;
+      handX += (torsoX + ai * 7.5 - handX) * sd;
+      handY += (hipY + 1.0        - handY) * sd;
+      tipX  += (torsoX + ai * 8.5 - tipX)  * sd;
+      tipY  += (hipY + 25.0       - tipY)  * sd;
     }
     // 腕
     ctx.strokeStyle = W.jacket; ctx.lineWidth = 4.2; ctx.lineCap = 'round';
