@@ -850,6 +850,7 @@ var CONFIG = {
   airPitchFloor:        0.30,   // 前後回転が真横のとき、体が線に潰れないための下限
   airRaiseFade:         0.22,   // 踏切の「万歳」が下りるまで（回転の進みに対する割合）
   airTuckLift:            16,   // 抱え込みで足が上がる量(px)
+  airSkiCross:          0.42,   // 板をクロスさせる角度(rad)。抱え込みに合わせて交差させる
 
   // --- スポンサー枠（§21）---
   // ★ここは「データ」。コードにロゴを書かない。実ロゴを載せるときは
@@ -1238,20 +1239,26 @@ function checkAirCourseInvariant(moguls, zone, label){
           これを入れないと、絵が平面のまま回っているようにしか見えない（§20.8） */
 /* ★v6.4: 実機フィードバックで見直した。
    arc = 体を片側だけへ倒す量(rad)。0 から arc まで行って戻る（反対側へは行かない）*/
+/* raise  = 踏切で万歳するか（0〜1）。★360 は横に開いたままにするので 0
+   twist  = 捻りを「体がねじれて見える傾き」として足す量(rad)。★v6.5
+   cross  = 抱え込みに合わせて板をクロスさせるか（0〜1）。★v6.5 */
 var AIR_SPIN = {
-  // 360：体を立てたまま縦軸で 1 回転。腕は開いたまま
+  // 360：体を立てたまま縦軸で 1 回転。★腕とストックは最初から最後まで横のまま
   '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.08, arc: 0.00,
-                armMode: 'spread' },
+                armMode: 'spread', raise: 0 },
   // ★バックフル（v6.4）：画面内で横に一周させない（＝カートホイールに見せない）。
   //   縦軸で 1 捻り ＋「頭が真下に下がって戻る」前後回転を 1 回。
   //   前後回転は pitchTurns で表す。真後ろから見た宙返りは、横に回るのではなく
   //   体が縦に潰れて上下が入れ替わる形に見えるため
+  //   ★v6.5: 捻りが見えないという指摘を受けて twist を足した。
+  //   逆さになるのと縦軸 1 回転が同時に終わると、真後ろからは「ただ逆さになった」
+  //   ようにしか見えない。捻りの途中で体が左右にねじれて見える成分を足す
   'backFull': { flip: 0, yaw: 1, tilt: 0.00, wob: 0.03, arc: 0.00,
-                pitchTurns: 1, armMode: 'side' },
+                pitchTurns: 1, armMode: 'side', raise: 1, twist: 0.42 },
   // ★オフアクシス 720（v6.4）：時計の 12 時〜4 時の側だけを使う。左半分へは入れない。
   //   途中で抱え込む（tuck）
   'cork720':  { flip: 0, yaw: 2, tilt: 0.00, wob: 0.00, arc: 2.09,
-                armMode: 'spread', tuck: 1 }   // 2.09rad = 120° = 4 時
+                armMode: 'spread', tuck: 1, raise: 1, cross: 1 }  // 2.09rad = 120° = 4 時
 };
 
 /* 回転の進み方（§20.8。★v6.3 で実写に合わせて作り直した）
@@ -3315,6 +3322,7 @@ function drawPlayer(cx, judgeY){
   var airRaise = 0;      // 万歳（両腕を上げて体を伸ばす）
   var airSide  = 0;      // 腕を体側に付ける（バックフル）
   var airKnee  = 0;      // 抱え込み（オフアクシス 720）
+  var airCross = 0;      // 板のクロス（オフアクシス 720）
   var pitchSy  = 1;      // 前後回転の縦の潰れ（負なら上下が入れ替わる＝逆さ）
   if (air) {
     if (air.stage === 'takeoff') {
@@ -3326,7 +3334,9 @@ function drawPlayer(cx, judgeY){
         // セットできていない → 沈んだまま、振れた姿勢でリップを越える（§17.3.2）
         tkPose = CONFIG.absorbDepth * Math.min(1, tk / 0.5);
       }
-      airRaise = tk;                                   // ★踏切で万歳。リップで最大
+      // ★踏切で万歳。リップで最大。360 は横に開いたままなので上げない
+      var tkSpin = AIR_SPIN[air.trick] || AIR_SPIN['360'];
+      airRaise = tk * (tkSpin.raise === undefined ? 1 : tkSpin.raise);
     } else if (air.stage === 'flight') {
       airH = Math.sin(Math.PI * clamp(air.u, 0, 1)) * CONFIG.airMaxHeight;
     }
@@ -3387,8 +3397,10 @@ function drawPlayer(cx, judgeY){
     airSpread = clamp(airSpread, 0, 1);
     airSide   = (spin.armMode === 'side' ? peak : 0) * (1 - open);
     airKnee   = (spin.tuck || 0) * Math.pow(peak, 1.3) * (1 - open);
-    // 万歳は回り始めると下ろす
-    airRaise  = Math.max(airRaise, clamp(1 - e / CONFIG.airRaiseFade, 0, 1)) * (1 - open);
+    // 万歳は回り始めると下ろす。★raise が 0 の技（360）は最初から上げない
+    airRaise  = Math.max(airRaise, clamp(1 - e / CONFIG.airRaiseFade, 0, 1)) *
+                (spin.raise === undefined ? 1 : spin.raise) * (1 - open);
+    airCross  = (spin.cross || 0) * Math.pow(peak, 1.3) * (1 - open);
 
     // ★前後回転（バックフル）。真後ろから見た宙返りは横に回らず、
     //   体が縦に潰れて上下が入れ替わる。cos が負になった区間が「逆さ」
@@ -3404,7 +3416,10 @@ function drawPlayer(cx, judgeY){
     // ★v6.3: 踏切と着地では体が立っている。傾きは回転と一緒に出入りさせる
     // ★v6.4: arc は「片側だけへ倒れて戻る」動き。sin なので必ず 0 以上＝反対側へ入らない
     var arcLean = (spin.arc || 0) * Math.sin(Math.PI * e);
-    var lean = (spin.tilt + spin.wob * Math.cos(yawA) + arcLean) *
+    // ★v6.5 捻りを見せる成分。sin(yaw) なので踏切と着地では 0、捻りの途中で最大。
+    //   左右に振れるので「ねじり込んでいる」ように見える
+    var twistLean = (spin.twist || 0) * Math.sin(yawA);
+    var lean = (spin.tilt + spin.wob * Math.cos(yawA) + arcLean + twistLean) *
                airLeanRamp(air.u) * (1 - open);
 
     ctx.translate(footX, footY - airH);
@@ -3449,12 +3464,20 @@ function drawPlayer(cx, judgeY){
   ctx.rotate(p.lean * CONFIG.edgeAngle);
   for (var sk = -1; sk <= 1; sk += 2) {
     var sxc = sk * CONFIG.skiGap;             // 板の中心。★モーグルは板を閉じて滑る
+    ctx.save();
+    // ★v6.5 抱え込みに合わせて板をクロスさせる。ブーツを軸にトップを内側へ振る
+    if (airCross > 0.001) {
+      ctx.translate(sxc, -6);
+      ctx.rotate(sk * airCross * CONFIG.airSkiCross);
+      ctx.translate(-sxc, 6);
+    }
     ctx.fillStyle = W.ski;
     skiPath(sxc, -13, 6.4, 45);               // ブーツより下（進行方向）を長く見せる
     ctx.fill();
     ctx.fillStyle = W.skiTop;                 // 上面（見えている側）を細く乗せる
     skiPath(sxc, -11.5, 2.8, 41);
     ctx.fill();
+    ctx.restore();
   }
   ctx.restore();
 
