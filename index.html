@@ -837,6 +837,17 @@ var CONFIG = {
   finishLineColor:       '#d8382c',                // フィニッシュラインの色
   hudInterval:           0.06,  // HUD(DOM) の更新間隔(秒)
 
+  // --- 空中の動き（§20.8。実写のコマ送りから決めた）---
+  // ★すべて「滞空時間に対する割合」で持つ。ゲームの滞空が実写より短くても、
+  //   同じ見え方のまま自動で縮む
+  airRotStart:           0.10,  // 滞空のどこから回り始めるか。踏切直後は伸び上がっている
+  airRotEnd:             0.78,  // どこで回り切るか。★着地前に回り終わるのが実際の動き
+  airRotLinear:          0.65,  // 回転を等速に寄せる割合（1.0 で完全等速）
+  airLeanRise:           0.16,  // 軸の傾きが出るまでの時間（滞空に対する割合）
+  airLeanFall:           0.14,  // 回り切ってから体が立つまでの時間（同上）
+  airArmSpread:          5.5,   // 空中で腕を横に開く量(px)。実写では腕は開いたまま
+  airArmLift:            4.0,   // 空中で手が上がる量(px)
+
   // --- スポンサー枠（§21）---
   // ★ここは「データ」。コードにロゴを書かない。実ロゴを載せるときは
   //   sponsors に { name, img:'data:image/png;base64,...' } を足すだけで切り替わる。
@@ -1223,17 +1234,35 @@ function checkAirCourseInvariant(moguls, zone, label){
           真後ろから見ると、斜めの軸で回る体は「傾きが左右に振れて」見える。
           これを入れないと、絵が平面のまま回っているようにしか見えない（§20.8） */
 var AIR_SPIN = {
-  '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.15 },
-  'backFull': { flip: 1, yaw: 1, tilt: 0.10, wob: 0.22 },
-  'cork720':  { flip: 1, yaw: 2, tilt: 0.42, wob: 0.34 }   // オフアクシス＝斜めの軸
+  // ★v6.3: 実写のコマ送り（ウォータージャンプ 3 本）から見直した
+  '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.10 },  // 体は立てたまま。倒れない
+  'backFull': { flip: 1, yaw: 1, tilt: 0.08, wob: 0.18 },  // レイアウト（伸身）に近い
+  'cork720':  { flip: 1, yaw: 2, tilt: 0.60, wob: 0.30 }   // オフアクシス。踏切直後から体が倒れる
 };
 
-/* 回転の進み方（§20.8）。★等速で回すと機械的に見える。
-   踏切直後はまだ回っていない → 中盤が最も速い → 着地に向けて回り切って止まる。
-   u が 1 を超えた分（着地が遅い）はゆっくり回りすぎる */
+/* 回転の進み方（§20.8。★v6.3 で実写に合わせて作り直した）
+   実写で分かったこと:
+   ・踏切直後の 1 割は伸び上がっていて、まだ回っていない
+   ・回り始めてからはほぼ等速。S字に強く緩急を付けると別の動きに見える
+   ・★着地の手前で回り切って、そこから着地までは姿勢を保っている
+     （回りながら着地しているように描くと「雑」に見える最大の原因）
+   u は滞空に対する割合なので、ゲームの滞空が短くても見え方は変わらない */
 function airRotEase(u){
-  var t = clamp(u, 0, 1);
-  return t * t * (3 - 2 * t) + Math.max(0, u - 1) * 0.35;
+  var a = CONFIG.airRotStart, b = CONFIG.airRotEnd;
+  var t = clamp((u - a) / Math.max(0.05, b - a), 0, 1);
+  var sm = t * t * (3 - 2 * t);                       // 完全な S 字
+  var k  = clamp(CONFIG.airRotLinear, 0, 1);
+  return t * k + sm * (1 - k);                        // ほぼ等速。両端だけ丸める
+}
+
+/* 軸の傾きの出方（★v6.3）。tilt / wob をそのまま掛けると、
+   まだ回っていない踏切の瞬間から体が倒れた絵になってしまう。
+   実写では 踏切は立っている → 回り始めてから倒れる → 回り切ると立って着地する。
+   0〜1 を返し、tilt と wob に掛ける */
+function airLeanRamp(u){
+  var up   = clamp((u - CONFIG.airRotStart) / CONFIG.airLeanRise, 0, 1);
+  var down = clamp((u - CONFIG.airRotEnd)   / CONFIG.airLeanFall, 0, 1);
+  return up * (1 - down);
 }
 
 var SET_LABEL = { perfect:'PERFECT SET', good:'GOOD SET', none:'NO SET' };
@@ -3267,7 +3296,7 @@ function drawPlayer(cx, judgeY){
   var torsoX = p.line + swing * (fixed ? CONFIG.torsoFollow : 1);
 
   // --- AIR（§17.3）---
-  var air = activeAir(G.playerD), airH = 0, tkPose = 0, airTuck = 0;
+  var air = activeAir(G.playerD), airH = 0, tkPose = 0, airSpread = 0;
   if (air) {
     if (air.stage === 'takeoff') {
       var tk = clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1);
@@ -3323,19 +3352,21 @@ function drawPlayer(cx, judgeY){
     //   実際の体は横から見ても肩と板のぶんの厚みがある（§20.8）
     if (Math.abs(sx) < 0.42) sx = sx < 0 ? -0.42 : 0.42;
 
-    // ★体をたたむ量（§20.8）。踏切で素早くたたみ、着地に向けて開く。
-    //   腕とストックの位置に使う。回すだけの絵と、たたんで回る体の差はここで出る
-    airTuck = Math.sin(Math.PI * clamp(air.u, 0, 1)) * (1 - open);
-    airTuck = clamp(airTuck, 0, 1);
+    // ★v6.3: 実写では腕とストックは「開いたまま」回っている。
+    //   胸にたたむ動き（v6.0）は 3 本のどれにも出てこなかったので、開く方へ変えた。
+    //   体も縮めない（バックフルはレイアウト＝伸身に近い）
+    airSpread = Math.sin(Math.PI * clamp(air.u, 0, 1)) * (1 - open);
+    airSpread = clamp(airSpread, 0, 1);
 
     // ★斜めの軸で回る体は、真後ろから見ると傾きが左右に振れる
-    var lean = (spin.tilt + spin.wob * Math.cos(yawA)) * (1 - open);
+    // ★v6.3: 踏切と着地では体が立っている。傾きは回転と一緒に出入りさせる
+    var lean = (spin.tilt + spin.wob * Math.cos(yawA)) * airLeanRamp(air.u) * (1 - open);
 
     ctx.translate(footX, footY - airH);
     ctx.scale(1 + hR * 0.10, 1 + hR * 0.10);           // 手前に来るぶんだけ大きく
     ctx.rotate(lean + flipA + (flipT - flipA) * open);
     // 体の軸で縦に伸ばす（たたむと縮む）。回したあとに掛けるので体基準になる
-    ctx.scale(sx + (1 - sx) * open, 1 - airTuck * 0.10);
+    ctx.scale(sx + (1 - sx) * open, 1);          // ★縦に縮めない（伸身）
     ctx.translate(-footX, -footY);
   } else if (air && air.landLeanT > 0) {
     // 着地姿勢：早い＝後傾／遅い＝前傾（§17.4）
@@ -3449,13 +3480,13 @@ function drawPlayer(cx, judgeY){
     var handY = shoY + 12.5 - on * 2.0;           // 突くときは手が少し上がる
     var tipX  = torsoX + ai * (27.0 + on * 6.0);
     var tipY  = shoY + 33.0 + on * CONFIG.polePlantDrop;
-    // ★空中では腕を胸に引きつけ、ストックを前で交差させる（§20.8）
-    if (airTuck > 0.001) {
-      var k = airTuck;
-      handX += (torsoX + ai * 6.5  - handX) * k;
-      handY += (shoY + 8.5         - handY) * k;
-      tipX  += (torsoX - ai * 6.0  - tipX)  * k;   // 反対側へ少し回してクロスさせる
-      tipY  += (shoY + 24.0        - tipY)  * k;
+    // ★v6.3: 空中では腕とストックを外へ開く（実写のコマ送りがそうなっている）
+    if (airSpread > 0.001) {
+      var k = airSpread;
+      handX += ai * CONFIG.airArmSpread * k;
+      handY -= CONFIG.airArmLift * k;
+      tipX  += ai * CONFIG.airArmSpread * 1.7 * k;
+      tipY  -= CONFIG.airArmLift * 0.5 * k;
     }
     // 腕
     ctx.strokeStyle = W.jacket; ctx.lineWidth = 4.2; ctx.lineCap = 'round';
