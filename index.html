@@ -1239,13 +1239,15 @@ function checkAirCourseInvariant(moguls, zone, label){
           これを入れないと、絵が平面のまま回っているようにしか見えない（§20.8） */
 /* ★v6.4: 実機フィードバックで見直した。
    arc = 体を片側だけへ倒す量(rad)。0 から arc まで行って戻る（反対側へは行かない）*/
-/* raise  = 踏切で万歳するか（0〜1）。★360 は横に開いたままにするので 0
+/* raise  = 踏切で万歳するか（0〜1）。★360・オフアクシス720 は横に開いたままにするので 0
+   armSpread = 空中で腕を横に開く量(px)。省略すると CONFIG.airArmSpread。★v6.6
    twist  = 捻りを「体がねじれて見える傾き」として足す量(rad)。★v6.5
    cross  = 抱え込みに合わせて板をクロスさせるか（0〜1）。★v6.5 */
 var AIR_SPIN = {
   // 360：体を立てたまま縦軸で 1 回転。★腕とストックは最初から最後まで横のまま
+  //   ★v6.6: 腕を伸ばす。開く量を大きくして肩から手までが一直線に見えるようにする
   '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.08, arc: 0.00,
-                armMode: 'spread', raise: 0 },
+                armMode: 'spread', raise: 0, armSpread: 11.5 },
   // ★バックフル（v6.4）：画面内で横に一周させない（＝カートホイールに見せない）。
   //   縦軸で 1 捻り ＋「頭が真下に下がって戻る」前後回転を 1 回。
   //   前後回転は pitchTurns で表す。真後ろから見た宙返りは、横に回るのではなく
@@ -1257,8 +1259,10 @@ var AIR_SPIN = {
                 pitchTurns: 1, armMode: 'side', raise: 1, twist: 0.42 },
   // ★オフアクシス 720（v6.4）：時計の 12 時〜4 時の側だけを使う。左半分へは入れない。
   //   途中で抱え込む（tuck）
+  //   ★v6.6: 踏切は 360 と同じ（万歳しない）
   'cork720':  { flip: 0, yaw: 2, tilt: 0.00, wob: 0.00, arc: 2.09,
-                armMode: 'spread', tuck: 1, raise: 1, cross: 1 }  // 2.09rad = 120° = 4 時
+                armMode: 'spread', tuck: 1, raise: 0, cross: 1,
+                armSpread: 11.5 }  // 2.09rad = 120° = 4 時
 };
 
 /* 回転の進み方（§20.8。★v6.3 で実写に合わせて作り直した）
@@ -3323,6 +3327,7 @@ function drawPlayer(cx, judgeY){
   var airSide  = 0;      // 腕を体側に付ける（バックフル）
   var airKnee  = 0;      // 抱え込み（オフアクシス 720）
   var airCross = 0;      // 板のクロス（オフアクシス 720）
+  var airSpreadPx = CONFIG.airArmSpread;   // 技ごとの腕の開き量（★v6.6）
   var pitchSy  = 1;      // 前後回転の縦の潰れ（負なら上下が入れ替わる＝逆さ）
   if (air) {
     if (air.stage === 'takeoff') {
@@ -3401,6 +3406,7 @@ function drawPlayer(cx, judgeY){
     airRaise  = Math.max(airRaise, clamp(1 - e / CONFIG.airRaiseFade, 0, 1)) *
                 (spin.raise === undefined ? 1 : spin.raise) * (1 - open);
     airCross  = (spin.cross || 0) * Math.pow(peak, 1.3) * (1 - open);
+    airSpreadPx = (spin.armSpread === undefined) ? CONFIG.airArmSpread : spin.armSpread;
 
     // ★前後回転（バックフル）。真後ろから見た宙返りは横に回らず、
     //   体が縦に潰れて上下が入れ替わる。cos が負になった区間が「逆さ」
@@ -3558,9 +3564,9 @@ function drawPlayer(cx, judgeY){
     // ★v6.3: 空中では腕とストックを外へ開く（実写のコマ送りがそうなっている）
     if (airSpread > 0.001) {
       var k = airSpread;
-      handX += ai * CONFIG.airArmSpread * k;
+      handX += ai * airSpreadPx * k;
       handY -= CONFIG.airArmLift * k;
-      tipX  += ai * CONFIG.airArmSpread * 1.7 * k;
+      tipX  += ai * airSpreadPx * 1.5 * k;
       tipY  -= CONFIG.airArmLift * 0.5 * k;
     }
     // ★v6.4 万歳（踏切）。両腕を上げて体を伸ばす
