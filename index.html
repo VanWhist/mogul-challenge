@@ -102,7 +102,9 @@
   #startOverlay .resRow{width:186px;}
   /* 難易度選択（§7.4 / §19.2） */
   .diffLbl{font-size:9px;letter-spacing:.18em;color:#8fb4d4;margin-bottom:6px;}
-  #diffRow{display:flex;gap:6px;margin-bottom:7px;}
+  /* ★v6.7 難易度は 4 つ。320px でも 1 行に収める */
+  #diffRow{display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap;justify-content:center;}
+  #stage.narrow .diffbtn{padding:8px 10px;font-size:10.5px;letter-spacing:.06em;}
   .diffbtn,.trickbtn{min-height:44px;}
   .diffbtn{appearance:none;border:1px solid rgba(143,180,212,.45);background:transparent;
     color:#b9d2e6;font-size:11px;font-weight:700;letter-spacing:.10em;padding:8px 14px;
@@ -406,6 +408,7 @@
       <button class="diffbtn" type="button" data-diff="beginner">初級</button>
       <button class="diffbtn" type="button" data-diff="intermediate">中級</button>
       <button class="diffbtn" type="button" data-diff="advanced">上級</button>
+      <button class="diffbtn" type="button" data-diff="veryHard">超級</button>
     </div>
     <div class="diffNote" id="diffNote"></div>
     <div class="diffLbl">AIR 1 の技</div>
@@ -702,11 +705,41 @@ var CONFIG = {
   jitterSections: {
     beginner:     { upper: false, middle: false, lower: false },
     intermediate: { upper: false, middle: true,  lower: false },
-    advanced:     { upper: true,  middle: true,  lower: true  }
+    advanced:     { upper: true,  middle: true,  lower: true  },
+    veryHard:     { upper: true,  middle: true,  lower: true  }
   },
   // 揺らぎの幅。難易度に無い場合は gapJitter を使う。
-  // 上級 0.20 で間隔 2.87〜3.98m（実際のコースは 2.5〜4.0m）
-  jitterAmp: { beginner: 0.00, intermediate: 0.12, advanced: 0.20 },
+  // ★v6.7: 難易度の差を広げた（上級でも 90 点が出るという実機フィードバック）
+  //   超級は「かなり細かく／かなり広く」を出すために実コースの範囲を超えて振る
+  jitterAmp: { beginner: 0.00, intermediate: 0.10, advanced: 0.13, veryHard: 0.17 },
+
+  /* ★v6.8 コブ間隔の「うねり」（§7.4）
+     ばらばらな揺らぎだけでは、細かい区間・広い区間として目に見えなかった。
+     コース全体に低い周波数の波をかけて「詰まった区間」と「開いた区間」を作る。
+     amp = 基準間隔に対する振れ幅 / waves = コース全体での波の数（1 波 ≒ 8 コブ）      */
+  spacingWave: {
+    beginner:     { amp: 0.00, waves: 0, phase: 0.0 },
+    intermediate: { amp: 0.18, waves: 4, phase: 0.6 },
+    advanced:     { amp: 0.28, waves: 6, phase: 1.1 },
+    veryHard:     { amp: 0.40, waves: 7, phase: 2.3 }
+  },
+
+  /* ★v6.7 難易度ごとの判定のきびしさ（§7.4）
+     それまで判定窓は全難易度で共通で、違うのはコブ間隔の揺らぎだけだった。
+     そのため上級でも 90 点が出てしまっていた。窓とペースタイムも難易度で変える。
+
+     ★不変条件（§22.1）は難易度ごとに満たすこと:
+        okWindow < targetSegment <= (1 − jitterAmp) / 2                     */
+  diffTuning: {
+    beginner:     { perfect: 0.200, good: 0.340, ok: 0.440, target: 0.450, pace: 6.6,
+                    speed: 0.95, min: 0.65, max: 1.40 },
+    intermediate: { perfect: 0.100, good: 0.200, ok: 0.300, target: 0.350, pace: 7.3,
+                    speed: 1.00, min: 0.65, max: 1.50 },
+    advanced:     { perfect: 0.055, good: 0.120, ok: 0.230, target: 0.290, pace: 8.5,
+                    speed: 1.15, min: 0.80, max: 1.70 },
+    veryHard:     { perfect: 0.035, good: 0.078, ok: 0.165, target: 0.210, pace: 9.2,
+                    speed: 1.30, min: 0.95, max: 1.90 }
+  },
 
   // 採点（§18.2 で確定）
   turnScoreMax:      60,
@@ -868,26 +901,45 @@ var CONFIG = {
 /* =========================================================================
    §22.1 不変条件チェック（起動時）
    ========================================================================= */
+/* ★v6.7 難易度ごとの設定を「いま使う値」へ写す。
+   判定コードは CONFIG.perfectWindow などをそのまま読むので、
+   難易度を選んだ瞬間にここで差し替える。判定の式そのものは変えない */
+function applyDifficultyTuning(diff){
+  var t = (CONFIG.diffTuning && CONFIG.diffTuning[diff]) || null;
+  if (!t) return;
+  CONFIG.perfectWindow = t.perfect;
+  CONFIG.goodWindow    = t.good;
+  CONFIG.okWindow      = t.ok;
+  CONFIG.targetSegment = t.target;
+  CONFIG.paceSpeed     = t.pace;
+  // ★v6.8 上級・超級はスクロールそのものを速くする。
+  //   ratio の分母（gapPx）は基準間隔のままなので、判定の「距離」の窓は変わらない。
+  //   速くなるぶん、同じ窓が「時間」としては短くなる＝難しくなる
+  if (t.speed) { CONFIG.startSpeed = t.speed; CONFIG.minSpeed = t.min; CONFIG.maxSpeed = t.max; }
+}
+
 var invariantIssues = [];
 (function checkInvariants(){
-  if (!(CONFIG.okWindow < CONFIG.targetSegment)) {
-    invariantIssues.push('okWindow(' + CONFIG.okWindow + ') < targetSegment(' + CONFIG.targetSegment +
-      ') が不成立 → 通常MISSの帯が消えます');
-  }
-  // §22.1 は難易度ごとに揺らぎ幅が変わるので、3 つすべてで確認する（§7.4 守ること 3）
+  // §22.1 は難易度ごとに窓も揺らぎ幅も変わるので、★全難易度で確認する（§7.4 守ること 3）
   var okLines = [];
-  for (var key in CONFIG.jitterSections) {
+  for (var key in CONFIG.diffTuning) {
+    var t   = CONFIG.diffTuning[key];
     var eff = effectiveJitter(key);            // 揺らぎの幅は難易度ごと（§7.4 / §22.1）
-    var rhs = (1 - eff) / 2;
-    if (!(CONFIG.targetSegment <= rhs + 1e-9)) {
-      invariantIssues.push(key + ': targetSegment(' + CONFIG.targetSegment + ') <= (1-' + eff +
+    var wav = waveAmpOf(key);                  // ★v6.8 うねりも最小間隔を縮める
+    var rhs = (1 - eff - wav) / 2;
+    if (!(t.ok < t.target)) {
+      invariantIssues.push(key + ': okWindow(' + t.ok + ') < targetSegment(' + t.target +
+        ') が不成立 → 通常MISSの帯が消えます');
+    }
+    if (!(t.target <= rhs + 1e-9)) {
+      invariantIssues.push(key + ': targetSegment(' + t.target + ') <= (1-' + eff + '-' + wav +
         ')/2(' + rhs.toFixed(3) + ') が不成立 → 隣のコブと担当区間が重なります');
     } else {
-      okLines.push(key + ' ' + CONFIG.targetSegment + '<=' + rhs.toFixed(3));
+      okLines.push(key + ' ' + t.target + '<=' + rhs.toFixed(3));
     }
-  }
-  if (!(CONFIG.perfectWindow <= CONFIG.goodWindow && CONFIG.goodWindow <= CONFIG.okWindow)) {
-    invariantIssues.push('perfectWindow <= goodWindow <= okWindow の順序が崩れています');
+    if (!(t.perfect <= t.good && t.good <= t.ok)) {
+      invariantIssues.push(key + ': perfectWindow <= goodWindow <= okWindow の順序が崩れています');
+    }
   }
   // セット入力の窓（§17.3.2 不変条件 (1)(2)）
   if (!(CONFIG.airSetGoodM <= CONFIG.airTakeoffM)) {
@@ -909,7 +961,7 @@ var invariantIssues = [];
     console.warn('[CONFIG WARNING] ' + invariantIssues[i]);
   }
   if (!invariantIssues.length) {
-    console.log('[CONFIG] 不変条件 OK : okWindow ' + CONFIG.okWindow + ' < targetSegment / ' +
+    console.log('[CONFIG] 不変条件 OK : targetSegment<=(1-jitter)/2 → ' +
       okLines.join(' / ') + ' / ゲート ' + gateM.toFixed(1) + 'm vs CF ' + cfM.toFixed(1) + 'm');
   }
 })();
@@ -1102,6 +1154,20 @@ function effectiveJitter(diff){
   return (j && (j.upper || j.middle || j.lower)) ? jitterAmpOf(diff) : 0;
 }
 
+// ★v6.8 うねりの振れ幅（難易度ごと）
+function waveAmpOf(diff){
+  var w = CONFIG.spacingWave && CONFIG.spacingWave[diff];
+  return (w && typeof w.amp === 'number') ? w.amp : 0;
+}
+
+/* ★v6.8 その位置での間隔の倍率。低い周波数の波で「詰まった区間／開いた区間」を作る。
+   最小間隔の比は (1 − うねり − 揺らぎ)。§22.1 の不変条件はこの値で見る */
+function spacingFactorAt(dPx, clPx, diff){
+  var w = CONFIG.spacingWave && CONFIG.spacingWave[diff];
+  if (!w || !w.amp || !w.waves || clPx <= 0) return 1;
+  return 1 + w.amp * Math.sin(2 * Math.PI * w.waves * (dPx / clPx) + (w.phase || 0));
+}
+
 function buildCourse(){
   var spacing = CONFIG.mogulSpacingM * CONFIG.pxPerMeter;    // コブ間隔(px)
   var clPx    = CONFIG.courseLengthM * CONFIG.pxPerMeter;    // CL(px)
@@ -1130,7 +1196,8 @@ function buildCourse(){
     if (inZone) { d = inZone.end; section = inZone.index; continue; }   // 区間の終端まで飛ばす
     grid.push({ d: d, side: side, section: section });
     side = -side;                                             // 完全交互（§7.1）はエアをまたいでも継続
-    d += spacing;
+    // ★v6.8 うねり。ここで間隔そのものを伸び縮みさせる（揺らぎはこのあと位置に足す）
+    d += spacing * spacingFactorAt(d, clPx, CONFIG.difficulty);
   }
 
   // 難易度による揺らぎ（§7.4）。本数・区間境界・CL は難易度によらず同一。
@@ -1542,7 +1609,9 @@ function handleTurnInput(dir, tMs){
   var m = activeTarget(dAt);
   if (!m) {                                           // 2. Active Target なし → 空振り（§9）
     applyResult('whiff', null);
-    G.inputLockUntilMs = tMs + CONFIG.inputLock * 1000;
+    // ★v6.9 ロックは「秒」で持つと速い難易度で長すぎる（コブ間隔が 0.2 秒しかない）。
+    //   スクロールが速いほど短くする。連打対策としての役割は保ったまま
+    G.inputLockUntilMs = tMs + CONFIG.inputLock * 1000 / Math.max(0.6, G.speed);
     return;
   }
   var sr = (m.d - dAt) / gapPx;                       // 符号付き（+=早い / -=遅い）。演出用
@@ -1778,8 +1847,14 @@ function eventTimeMs(e){
   return t;
 }
 
-function pressDir(dir, tMs){
-  if (heldDirs.size > 0 && !heldDirs.has(dir)) return;   // 反対側が押されたまま → 無視
+/* ★v6.9 ここは「タップしても反応しない」の原因だった箇所。
+   キーボードは「押しっぱなし」が起こるので、反対側が押されている間は無視してよい（§6）。
+   ★しかしタップは違う。速いリズムでは「前の指を離す前に次の指を置く」のが普通で、
+     その 2 本目を無視すると、押したのに何も起きない。コブは左右交互なので、
+     指が重なるたびに 1 本まるごと落ちる（実測：62 タップ中 9 回が消えた）。
+   → pointerdown は 1 回 = 1 入力として必ず受ける。 */
+function pressDir(dir, tMs, viaPointer){
+  if (!viaPointer && heldDirs.size > 0 && !heldDirs.has(dir)) return;
   heldDirs.add(dir);
   handleTurnInput(dir, tMs);
 }
@@ -1808,15 +1883,20 @@ stage.addEventListener('pointerdown', function(e){
   var rect = stage.getBoundingClientRect();
   var dir = (e.clientX - rect.left) < rect.width / 2 ? SIDE_LEFT : SIDE_RIGHT;
   pointerDirs.set(e.pointerId, dir);
-  pressDir(dir, eventTimeMs(e));                         // pointerdown 1回 = 1入力
+  pressDir(dir, eventTimeMs(e), true);                   // pointerdown 1回 = 1入力
 }, { passive:false });
 
 function releasePointer(e){
   var dir = pointerDirs.get(e.pointerId);
   if (dir !== undefined) { pointerDirs.delete(e.pointerId); heldDirs.delete(dir); }
 }
+/* ★v6.9 指を離すイベントは stage の外でも拾う。
+   指がステージの外へ出てから離れると pointerup が来ず、押しっぱなし扱いのまま残る。
+   キーボード側の判定がそれに引きずられるのを防ぐ */
 stage.addEventListener('pointerup', releasePointer);
 stage.addEventListener('pointercancel', releasePointer);
+window.addEventListener('pointerup', releasePointer);
+window.addEventListener('pointercancel', releasePointer);
 window.addEventListener('blur', function(){ heldDirs.clear(); pointerDirs.clear(); });
 window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
@@ -1856,6 +1936,7 @@ document.getElementById('btnResHome').addEventListener('click', goHome);
   for (var i = 0; i < btns.length; i++) {
     btns[i].addEventListener('click', function(){
       CONFIG.difficulty = this.getAttribute('data-diff');
+      applyDifficultyTuning(CONFIG.difficulty);    // ★v6.7 判定のきびしさも切り替える
       resetGame();
       showStartOverlay();
     });
@@ -1904,11 +1985,12 @@ function hideOverlays(){
 }
 
 // 難易度の表示名と説明（§7.4）
-var DIFF_LABEL = { beginner:'初級', intermediate:'中級', advanced:'上級' };
+var DIFF_LABEL = { beginner:'初級', intermediate:'中級', advanced:'上級', veryHard:'超級' };
 var DIFF_NOTE  = {
-  beginner:     'コブ間隔は一定。リズムを覚える',
-  intermediate: '中間部だけ間隔が揺らぐ',
-  advanced:     '全区間で間隔が揺らぐ（基準）'
+  beginner:     'コブ間隔は一定。判定もやさしい',
+  intermediate: '中間部が揺らぐ。詰まる区間と開く区間',
+  advanced:     '全区間で大きく変わる。スピードも速い',
+  veryHard:     'VERY HARD — 極端に詰まり、極端に開く。最速'
 };
 
 // 生成されたコースの実際のコブ間隔（m）。区間をまたぐ間隔（エア区間）は除く
@@ -3888,6 +3970,7 @@ if (!debugMode) {
   document.getElementById('btnDebug').style.display   = 'none';
 }
 
+applyDifficultyTuning(CONFIG.difficulty);        // ★v6.7 起動時の難易度を反映
 resetGame();
 // 初めて開いた人にはチュートリアルから始める（§19.7）。2 回目からはスタート画面から。
 // 文章の「あそびかた」は自動では出さず、HELP からいつでも読める（§19.5）
