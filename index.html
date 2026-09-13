@@ -105,7 +105,8 @@
   /* ★v6.7 難易度は 4 つ。320px でも 1 行に収める */
   #diffRow{display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap;justify-content:center;}
   #stage.narrow .diffbtn{padding:8px 10px;font-size:10.5px;letter-spacing:.06em;}
-  .diffbtn,.trickbtn{min-height:44px;}
+  .diffbtn{min-height:44px;}
+  .trickbtn{min-height:38px;}
   .diffbtn{appearance:none;border:1px solid rgba(143,180,212,.45);background:transparent;
     color:#b9d2e6;font-size:11px;font-weight:700;letter-spacing:.10em;padding:8px 14px;
     border-radius:999px;cursor:pointer;font-family:inherit;}
@@ -116,11 +117,15 @@
     margin-bottom:10px;height:12px;}
   #repeatWarn:empty{margin-bottom:4px;}
   /* 技の事前選択（§17.2） */
-  .trickRow{display:flex;gap:5px;margin-bottom:5px;}
+  /* ★v7.0 アップライトを足して 6 個になったので折り返す。狭い端末で 2 行になる */
+  .trickRow{display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap;}
   .trickbtn{appearance:none;border:1px solid rgba(143,180,212,.45);background:transparent;
-    color:#b9d2e6;font-size:10px;font-weight:700;letter-spacing:.06em;padding:8px 10px;
+    color:#b9d2e6;font-size:9.5px;font-weight:700;letter-spacing:.04em;padding:6px 9px;
     border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
   .trickbtn.on{background:#2f9bff;border-color:#2f9bff;color:#fff;}
+  /* アップライトは点が低いぶん易しい。3D と見分けが付くように色を変える */
+  .trickbtn.up{border-color:rgba(120,200,170,.45);color:#9ed8c2;}
+  .trickbtn.up.on{background:#2fb98a;border-color:#2fb98a;color:#fff;}
   /* エア進入表示（§17.3 APPROACH）。操作ボタンやタイミングバーは出さない */
   #airInfo{position:absolute;left:0;right:0;top:27%;z-index:3;text-align:center;
     pointer-events:none;}
@@ -273,6 +278,7 @@
   #resAirTable .nm{color:#eaf3fb;font-weight:700;}
   #resAirTable .sc{font-weight:900;color:#9be7c4;}
   #resAirTable .no{color:#e0a33a;font-weight:700;}
+  #resAirTable .gb{color:#2fb98a;font-weight:900;}   /* ★v7.0 グラブ */
   /* 表と注記の左端をそろえる（注記だけ中央寄せだと表からずれて見える） */
   #resAir{text-align:left;}
   .resRow.minus .rv{color:#e08a7a;}
@@ -413,12 +419,18 @@
     <div class="diffNote" id="diffNote"></div>
     <div class="diffLbl">AIR 1 の技</div>
     <div class="trickRow" data-air="1">
+      <button class="trickbtn up" type="button" data-air="1" data-trick="spread">SPREAD</button>
+      <button class="trickbtn up" type="button" data-air="1" data-trick="backScr">BACK SCR</button>
+      <button class="trickbtn up" type="button" data-air="1" data-trick="ironX">IRON X</button>
       <button class="trickbtn" type="button" data-air="1" data-trick="360">360</button>
       <button class="trickbtn" type="button" data-air="1" data-trick="backFull">BACK FULL</button>
       <button class="trickbtn" type="button" data-air="1" data-trick="cork720">CORK 720</button>
     </div>
     <div class="diffLbl" style="margin-top:7px">AIR 2 の技</div>
     <div class="trickRow" data-air="2">
+      <button class="trickbtn up" type="button" data-air="2" data-trick="spread">SPREAD</button>
+      <button class="trickbtn up" type="button" data-air="2" data-trick="backScr">BACK SCR</button>
+      <button class="trickbtn up" type="button" data-air="2" data-trick="ironX">IRON X</button>
       <button class="trickbtn" type="button" data-air="2" data-trick="360">360</button>
       <button class="trickbtn" type="button" data-air="2" data-trick="backFull">BACK FULL</button>
       <button class="trickbtn" type="button" data-air="2" data-trick="cork720">CORK 720</button>
@@ -463,8 +475,26 @@
 
       <div class="helpSec">
         <div class="helpH">エア</div>
-        <div class="helpP">エア台の手前で<em>1回タップして構えを作る</em>（セット）。
+        <div class="helpP">エア台の手前の<em>緑の SET ライン</em>でタップして構えを作る（セット）。
         <span id="helpSetM"></span>空中で<em>もう1回タップして着地を合わせる</em>。</div>
+      </div>
+
+      <div class="helpSec">
+        <div class="helpH">空中のボーナス</div>
+        <div class="helpP">飛んだ直後に技の名前が出ている間にタップすると成立する。
+        そのあと、いつも通り着地のタップをする。押さなくてもよい。<br>
+        <em>グラブ（板をつかむ）</em>…バックスクラッチャーは<em>セーフティ</em>（同じ側の板の後ろ）、
+        アイアンクロス・360・コーク720 は<em>ミュート</em>（体をまたいで反対側の板の前）。
+        どれも DD が上がる。<br>
+        <em>ホールド（形を保つ）</em>…バックフルはこちら。<em>グラブではない</em>ので
+        空中の姿勢は変わらず、DD も上がらない。上がるのは<em>技の完成度（評価点）</em>だけ。<br>
+        スプレッドは両腕を開くことが技なので<em>何もできない</em>。</div>
+      </div>
+
+      <div class="helpSec">
+        <div class="helpH">技えらび</div>
+        <div class="helpP">緑のボタン（SPREAD / BACK SCR / IRON X）は<em>回らない技</em>。
+        着地を合わせやすいかわりに DD が低い。青のボタンは回る技で DD が高い。</div>
       </div>
 
       <div class="helpSec">
@@ -775,17 +805,80 @@ var CONFIG = {
   // ---- STEP 4（AIR 1）----
   // 技（§17.1）。DD は FIS 公式 Degree of Difficulty 表（2023-11 男子）に準拠。
   // Back Full と Cork 720 は同格（どちらも 0.88）。Cork を「一番難しい技」にしないこと
+  // ★v7.0 アップライト（回転なし）を追加。FIS DD 表は「Single 0.40 ＋ マニューバの値」で作る。
+  //   Spread −0.02 / Back Scratcher +0.01 / Iron Cross +0.01（2023-11 男子）。
+  //   DD は 3D の半分以下。それでいい。★競技と同じ「回さないと点は出ない」を崩さないこと。
+  //   狙いは点ではなく入口。「自分にもできそう」と思える技を用意する（MIC の試遊フィードバック）
   airTricks: {
+    'spread':   { label:'SPREAD',     code:'S',   dd:0.38, upright:true },
+    'backScr':  { label:'BACK SCR',   code:'Y',   dd:0.41, upright:true },
+    'ironX':    { label:'IRON CROSS', code:'X',   dd:0.41, upright:true },
     '360':      { label:'360',       code:'3',   dd:0.68 },
     'backFull': { label:'BACK FULL', code:'bF',  dd:0.88 },
     'cork720':  { label:'CORK 720',  code:'7op', dd:0.88 }
   },
+
+  /* ---- 空中のボーナス入力（§17.7。★v7.0 → v7.1 → ★v7.2）----
+     飛行の前半にもう 1 タップすると成立する。★任意。押さなくても今まで通り。
+
+     ★v7.2：**ボーナスには 2 種類ある。グラブと、グラブではないもの。**
+     Van 様（SAJ テクニカルコーチ）の指定。混ぜると必ず間違えるので `type` で分けて持ち、
+     ★画面に出す言葉も必ず `type` から作ること。
+
+     | 技 | type | 表示 | 空中の姿勢 | 効果 |
+     |---|---|---|---|---|
+     | SPREAD | **なし** | — | — | 両腕を開くことが技そのものなので掴めない |
+     | BACK SCR | grab | SAFETY | 変わる | DD +0.14 |
+     | IRON CROSS | grab | MUTE | 変わる | DD +0.14 |
+     | 360 | grab | MUTE | 変わる | DD +0.14 |
+     | CORK 720 | grab | MUTE | 変わる | DD +0.14 |
+     | **BACK FULL** | **hold** | **HOLD** | **変わらない** | **DD は上げない。Quality ×1.08** |
+
+     ★★バックフルは**グラブではない**。「形を保って完成度（技のクオリティ）を上げる」入力である。
+       (1) **画面のどこにも GRAB と出さないこと**（合図・成立表示・リザルトのすべて）
+       (2) 空中の姿勢をまったく変えないこと（掴みにいく腕を描かない）
+       (3) DD は動かさない。上がるのは Quality だけ
+       ★v7.1 でここをミュートグラブにしてしまい、2 度指摘を受けて直した。
+         `type` / `kind` / `effect` は独立した設定で、1 つ直しても他は直らない */
+  grabOn:      true,           // 空中ボーナスそのものの ON/OFF
+  grabDD:      0.14,           // DD で効く上積み
+  grabQuality: 1.08,           // Quality で効く係数
+  // 技ごとの空中ボーナス。null なら押しても何も起きない（合図も出ない）
+  airBonusByTrick: {
+    spread:   null,
+    backScr:  { type:'grab', kind:'safety', label:'SAFETY', effect:'dd' },
+    ironX:    { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
+    '360':    { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
+    cork720:  { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
+    backFull: { type:'hold', kind:null,     label:'HOLD',   effect:'quality' }
+  },
+  // 飛行の進行 u のこの範囲のタップだけがグラブ。★着地の判定窓と重ねてはいけない。
+  // 一番速い超級でも、着地の recover 窓は u≈0.69 から。0.55 で切れば 150ms 以上あく
+  grabFromU:   0.18,
+  grabToU:     0.55,
+  grabLerp:      12,      // 手が板へ届くまでの速さ
+  grabReach:   0.85,      // 手が板に触れる深さ（1 でブーツ）
+  /* グラブの掴む場所（★v7.1。描画のみ）。Van 様提供のイラストに合わせた。
+     ★板は画面の上がテール／下がトップ（進行方向）なので、
+       「ブーツの後ろ」は y を小さく、「ブーツの前」は y を大きくする */
+  grabSafetyDy:  -8,     // セーフティ：同じ側の板の、ブーツより後ろ（テール側）
+  grabMuteDy:    10,     // ミュート：反対側の板の、ブーツより前（トップ側）
+  grabOutX:       6,     // 板の外側の面に手を置く量(px)。中心だと脚に隠れて手が見えない
+  /* セットの目印とグラブの合図（§17.3.3 / §17.7。★v7.0）。どちらも false で消せる。
+     ★消しても判定の窓は 1mm も変わらない。見えるか見えないかだけが変わる。
+     ★§17.3 の「タイミングバーは出さない」と緊張関係にあるので、切れる形で持っておく */
+  airSetMarkOn: true,
+  grabCueOn:    true,
   selectedAir1: '360',      // 事前選択（§17.2）。滑走中は変更しない
   selectedAir2: 'backFull', // v4.0 で '360'→'backFull'。既定のままでもリピートにならないように（§18.3）
 
   // 着地判定窓（ミリ秒。§17.4）。★この判定だけは時間基準。ターン判定の距離比率方式とは別物。
   // Cork 720 だけ狭くしないこと（Back Full と DD が同じなので選択が意味を失う）
+  // ★アップライトは回り切る必要がないぶん広い。初級の子が着地できることを優先する
   airLandWindows: {
+    'spread':   { perfect:175, good:285, recover:390 },
+    'backScr':  { perfect:175, good:285, recover:390 },
+    'ironX':    { perfect:165, good:275, recover:380 },
     '360':      { perfect:140, good:240, recover:340 },
     'backFull': { perfect:110, good:200, recover:290 },
     'cork720':  { perfect:110, good:200, recover:290 }
@@ -810,8 +903,8 @@ var CONFIG = {
   },
 
   // 失敗の波及（§17.6）。人工的な減点は足さず、着地後の滑りへ効かせる
-  airMissSpeedLoss:   { '360':0.06, backFull:0.12, cork720:0.12 },
-  airMissBalanceLoss: { '360':10,   backFull:20,   cork720:20 },
+  airMissSpeedLoss:   { spread:0.04, backScr:0.04, ironX:0.05, '360':0.06, backFull:0.12, cork720:0.12 },
+  airMissBalanceLoss: { spread:7,    backScr:7,    ironX:8,    '360':10,   backFull:20,   cork720:20 },
 
   /* ======== ここから下は §23 に無い実装・描画用（判定バランス非依存）======== */
   // エア区間 20m の内訳（m）。§7.3 の区間長は変えずに、この中でジャンプ台を配置する
@@ -884,6 +977,14 @@ var CONFIG = {
   airRaiseFade:         0.22,   // 踏切の「万歳」が下りるまで（回転の進みに対する割合）
   airTuckLift:            16,   // 抱え込みで足が上がる量(px)
   airSkiCross:          0.42,   // 板をクロスさせる角度(rad)。抱え込みに合わせて交差させる
+  // ---- アップライトの形（★v7.0。描画のみ）----
+  airLegSpreadX:          20,   // 大の字で脚とブーツが外へ開く量(px)
+  airLegSpreadSki:        17,   // 大の字で板が外へ開く量(px)
+  // ★真後ろから見たバックスクラッチャーは「板が横に開く」のではなく「板が背中側へ上がる」。
+  //   角度を付けすぎるとアイアンクロスと見分けが付かなくなるので、持ち上げを主役にする
+  airSkiKickLift:         26,   // バックスクラッチャーで板とブーツが上がる量(px)
+  airSkiKickAngle:      0.30,   // バックスクラッチャーでテールが開く角度(rad)
+  airIronCross:         0.95,   // アイアンクロスで板を交差させる角度(rad)。抱え込みより深い
 
   // --- スポンサー枠（§21）---
   // ★ここは「データ」。コードにロゴを書かない。実ロゴを載せるときは
@@ -949,6 +1050,26 @@ var invariantIssues = [];
   if (!(CONFIG.airSetGoodM < CONFIG.airApproachM - CONFIG.airTakeoffM)) {
     invariantIssues.push('airSetGoodM(' + CONFIG.airSetGoodM + ') < airApproachM-airTakeoffM(' +
       (CONFIG.airApproachM - CONFIG.airTakeoffM) + ') が不成立 → セット窓の早い側がエア区間の外へ出ます');
+  }
+  /* ★v7.0 グラブの窓（§17.7 不変条件）：grabToU < 着地判定が始まる u。
+     重なると「着地を狙ったタップがグラブになる」。
+     着地窓は ms、グラブ窓は飛行の割合なので、★難易度ごとにスピードを変えたときは必ずここを見る */
+  if (CONFIG.grabOn) {
+    for (var gk in CONFIG.diffTuning) {
+      var sp  = CONFIG.diffTuning[gk].speed || CONFIG.startSpeed;
+      var mps = CONFIG.baseScroll * sp / CONFIG.pxPerMeter;        // m/s
+      for (var gt in CONFIG.airLandWindows) {
+        var recU = (CONFIG.airLandWindows[gt].recover / 1000) * mps / CONFIG.airFlightM;
+        var openU = 1 - recU;                                      // 着地判定が始まる飛行の進み
+        if (!(CONFIG.grabToU < openU)) {
+          invariantIssues.push(gk + '/' + gt + ': grabToU(' + CONFIG.grabToU +
+            ') < 着地判定の開始 u(' + openU.toFixed(3) + ') が不成立 → 着地入力がグラブに化けます');
+        }
+      }
+    }
+    if (!(CONFIG.grabFromU > 0 && CONFIG.grabFromU < CONFIG.grabToU)) {
+      invariantIssues.push('0 < grabFromU < grabToU が不成立です');
+    }
   }
   // ゲート間隔が ICR の CF（CL の 1/10）から大きく外れていないか（§20.1）
   var gateM = CONFIG.gateEveryGaps * CONFIG.mogulSpacingM;
@@ -1250,7 +1371,10 @@ function buildAir(zone, trickKey, index){
   var dLip = zone.start + CONFIG.airApproachM * ppm;      // 踏切（リップ）
   var t    = CONFIG.airTricks[trickKey] || CONFIG.airTricks['360'];
   return {
-    index: index, trick: trickKey, label: t.label, dd: t.dd, code: t.code,
+    index: index, trick: trickKey, label: t.label,
+    ddBase: t.dd,        // ★技そのものの DD
+    dd: t.dd,            // ★グラブが成立したら ddBase + CONFIG.grabDD に上がる（§17.7）
+    code: t.code, upright: !!t.upright,
     dApproach: zone.start,
     dTakeoff:  dLip - CONFIG.airTakeoffM * ppm,
     // セットの理想位置。dTakeoff とは独立に持つ（TAKEOFF を動かさずに調整できるように。§17.3.2）
@@ -1272,7 +1396,18 @@ function buildAir(zone, trickKey, index){
     setResult: null,      // 'perfect' | 'good' | 'none'
     setDeltaM: null,      // 理想位置からのずれ(m)。+ が遅い
     setCenterT: 0,        // ニュートラルへ戻す残り時間(秒)
-    setCenterFrom: 0
+    setCenterFrom: 0,
+    // --- 空中ボーナス（§17.7。★v7.0 → v7.2）---
+    bonusOn: false,       // 成立したか
+    bonusU: null,         // 成立したときの飛行の進み
+    bonusType: null,      // 'grab' | 'hold'（★v7.2。表示の言葉はこれで決まる）
+    bonusKind: null,      // 'safety' | 'mute' | null（null は姿勢を変えない）
+    bonusLabel: null,     // 'SAFETY' | 'MUTE' | 'HOLD'
+    bonusEffect: null,    // 'dd' | 'quality'
+    bonusFactor: 1,       // Quality で効くボーナスの係数（着地の解決時に確定）
+    grabT: 0,             // 手が板へ届くまでの進行 0〜1（描画のみ）
+    // 回転のない技（アップライト）の形の進み。回転が 0 だと rot が使えないため（描画のみ）
+    poseE: 0
   };
 }
 
@@ -1311,6 +1446,21 @@ function checkAirCourseInvariant(moguls, zone, label){
    twist  = 捻りを「体がねじれて見える傾き」として足す量(rad)。★v6.5
    cross  = 抱え込みに合わせて板をクロスさせるか（0〜1）。★v6.5 */
 var AIR_SPIN = {
+  /* ---- アップライト（★v7.0）。flip も yaw も 0＝体は回らない。
+     回転が無いぶん、形そのものが読めないと何の技か分からない。
+     ★真後ろから見て読める形だけを選んでいる（前後開脚のダフィーは後ろからは読めないので入れない）。
+     回転が 0 だと peak（＝sin(π×回転の進み)）も 0 になるので、
+     アップライトは air.poseE（滞空の進みそのもの）で形を出し入れする ---- */
+  // スプレッドイーグル：腕と脚を大の字に開く。真後ろから一番読みやすい
+  'spread':   { flip: 0, yaw: 0, tilt: 0.00, wob: 0.00, arc: 0.00,
+                armMode: 'spread', raise: 0, armSpread: 15.0, legSpread: 1 },
+  // バックスクラッチャー：板のテールを背中側へ跳ね上げる
+  'backScr':  { flip: 0, yaw: 0, tilt: 0.00, wob: 0.00, arc: 0.00,
+                armMode: 'spread', raise: 0, armSpread: 11.5, skiKick: 1 },
+  // アイアンクロス：板を×に交差させる。cross の仕組みをそのまま使う（角度だけ深い）
+  'ironX':    { flip: 0, yaw: 0, tilt: 0.00, wob: 0.00, arc: 0.00,
+                armMode: 'spread', raise: 0, armSpread: 13.0,
+                cross: 1, crossAngle: 'iron', legSpread: 0.45 },
   // 360：体を立てたまま縦軸で 1 回転。★腕とストックは最初から最後まで横のまま
   //   ★v6.6: 腕を伸ばす。開く量を大きくして肩から手までが一直線に見えるようにする
   '360':      { flip: 0, yaw: 1, tilt: 0.00, wob: 0.08, arc: 0.00,
@@ -1331,6 +1481,35 @@ var AIR_SPIN = {
                 armMode: 'spread', tuck: 1, raise: 0, cross: 1,
                 armSpread: 11.5 }  // 2.09rad = 120° = 4 時
 };
+
+/* ★v7.0 技ごとの表の抜けを起動時に見つける（§22.1）。
+   技を 1 つ増やすと airTricks / airLandWindows / AIR_SPIN / airMissSpeedLoss /
+   airMissBalanceLoss の 5 か所を直す必要があり、どれか 1 つを忘れると
+   「その技だけ 360 の挙動になる」という気づきにくい不具合になる。
+   ★AIR_SPIN の定義より後でないと見られないので、§22.1 の本体とは別に置いている */
+(function checkTrickTables(){
+  for (var tk in CONFIG.airTricks) {
+    if (!CONFIG.airLandWindows[tk])       invariantIssues.push('airLandWindows に ' + tk + ' がありません');
+    if (!AIR_SPIN[tk])                    invariantIssues.push('AIR_SPIN に ' + tk + ' がありません');
+    if (CONFIG.airMissSpeedLoss[tk]   === undefined) invariantIssues.push('airMissSpeedLoss に ' + tk + ' がありません');
+    if (CONFIG.airMissBalanceLoss[tk] === undefined) invariantIssues.push('airMissBalanceLoss に ' + tk + ' がありません');
+    // ★v7.1 グラブは技ごと。掴めない技は null を明示すること（キーごと無いのは書き忘れ）
+    if (!Object.prototype.hasOwnProperty.call(CONFIG.airBonusByTrick, tk)) {
+      invariantIssues.push('airBonusByTrick に ' + tk + ' がありません（ボーナス無しなら null と書くこと）');
+    }
+    var bn = CONFIG.airBonusByTrick[tk];
+    // ★v7.2 hold なのに kind が入っていると、グラブでない技に掴む腕が描かれる
+    if (bn && bn.type === 'hold' && bn.kind) {
+      invariantIssues.push(tk + ': type が hold なのに kind が入っています（姿勢が変わってしまいます）');
+    }
+    if (bn && bn.type === 'grab' && !bn.kind) {
+      invariantIssues.push(tk + ': type が grab なのに kind がありません（掴む場所が決まりません）');
+    }
+  }
+  for (var i = 0; i < invariantIssues.length; i++) {
+    if (/がありません/.test(invariantIssues[i])) console.warn('[CONFIG WARNING] ' + invariantIssues[i]);
+  }
+})();
 
 /* 回転の進み方（§20.8。★v6.3 で実写に合わせて作り直した）
    実写で分かったこと:
@@ -1370,6 +1549,7 @@ var AIR_RESULT = {
   deep:    { label:'DEEP',            cls:'r-ok'      },
   miss:    { label:'AIR MISS',        cls:'r-miss'    },
   fall:    { label:'AIR FALL',        cls:'r-fall'    }
+  // ★v7.1 グラブの表示は技ごとに名前が変わるので、ここではなく resolveAirGrab で組み立てる
 };
 
 // 現在のスクロール速度(px/秒)。着地判定の ms ↔ px 換算に使う
@@ -1423,7 +1603,12 @@ function updateOneAir(a, dt){
     // タップするまで回り続ける。タップした瞬間から「開いて」上体を起こす（§17.4）
     if (a.inputDone) a.openT = Math.min(1, a.openT + CONFIG.airOpenLerp * dt);
     var spin = AIR_SPIN[a.trick] || AIR_SPIN['360'];
-    if (!a.inputDone) a.rot = airRotEase(a.u) * Math.max(spin.flip, spin.yaw);
+    if (!a.inputDone) {
+      a.rot   = airRotEase(a.u) * Math.max(spin.flip, spin.yaw);
+      a.poseE = airRotEase(a.u);      // 回転のない技はこちらで形を出し入れする（描画のみ）
+    }
+    // グラブは掴んだら着地入力まで保つ（実写もそうしている）
+    if (a.bonusOn && !a.inputDone) a.grabT = Math.min(1, a.grabT + CONFIG.grabLerp * dt);
 
     // 着地の解決（§17.4）。入力があればそのずれで、無ければ猶予を過ぎた時点で FALL
     var win = CONFIG.airLandWindows[a.trick] || CONFIG.airLandWindows['360'];
@@ -1468,6 +1653,41 @@ function finalizeAirSet(a){
   a.setDone   = true;
 }
 
+/* グラブ（§17.7。★v7.0）。飛行の前半のタップで成立し、DD が上がる。
+   ★任意。押さなければ今まで通りの 1 タップのまま。
+   ★窓は「飛行の進み u」で持つ。ms で持つと難易度でスピードが変わったときにずれる（§7.4）*/
+// その技の空中ボーナス（何も無い技は null）
+function airBonusOf(trickKey){
+  if (!CONFIG.grabOn) return null;
+  return (CONFIG.airBonusByTrick && CONFIG.airBonusByTrick[trickKey]) || null;
+}
+/* 画面に出す言葉は必ず type から作る（★v7.2）。
+   grab は掴む技なのでグラブ名を名乗らせ、hold は「形を保つ」なので GRAB とは出さない。
+   ★ここを共通化しておかないと、合図・成立表示・リザルトのどれかに GRAB が残る */
+function airBonusCue(b){  return b ? b.label : ''; }                       // 窓が開いている間の合図
+function airBonusDone(b){ return b ? (b.type === 'grab' ? b.label + ' GRAB!' : b.label + '!') : ''; }
+function canGrab(a){
+  return !!a && !!airBonusOf(a.trick) && a.stage === 'flight' && a.result === null &&
+         !a.bonusOn && !a.inputDone &&
+         a.u >= CONFIG.grabFromU && a.u <= CONFIG.grabToU;
+}
+function resolveAirGrab(a){
+  if (!canGrab(a)) return false;
+  var b = airBonusOf(a.trick);
+  a.bonusOn     = true;
+  a.bonusU      = a.u;
+  a.bonusType   = b.type;      // 'grab' | 'hold'
+  a.bonusKind   = b.kind;      // 'safety' | 'mute' | null（null は姿勢を変えない）
+  a.bonusLabel  = b.label;
+  a.bonusEffect = b.effect;
+  // ★効果は技ごとに違う（§17.7）。DD で効く技と、Quality で効く技がある
+  if (b.effect === 'dd') a.dd = a.ddBase + CONFIG.grabDD;
+  // 'quality' の技は着地の解決時に係数として掛ける（DD は動かさない）
+  showJudge({ label: airBonusDone(b), cls: 'r-perfect' });
+  playAirSet();                              // 構えができたときと同じ合図（§20.6）
+  return true;
+}
+
 // 着地入力。tMs があればその時刻のずれで判定、forced='fall' なら無入力の確定
 function resolveAirLanding(a, tMs, forced){
   if (!a || a.result !== null) return;
@@ -1492,7 +1712,11 @@ function resolveAirLanding(a, tMs, forced){
   // セットは加重平均ではなく係数として掛ける（§17.3.2）。FIS の Quality 帯の意味を壊さないため
   a.qualityLanding = airQualityOf(kind, delta, win);
   a.setFactor = CONFIG.airSetFactor[a.setResult || 'none'];
-  a.quality   = clamp(a.qualityLanding * a.setFactor, 0.1, 10.0);
+  // ★v7.1 Quality で効くグラブ（バックフル）はここで掛ける。
+  //   セット係数と同じ「係数として掛ける」形にそろえる（§17.3.2）。
+  //   クリップは 10.0 のままなので、上限そのものは動かない
+  a.bonusFactor = (a.bonusOn && a.bonusEffect === 'quality') ? CONFIG.grabQuality : 1;
+  a.quality   = clamp(a.qualityLanding * a.setFactor * a.bonusFactor, 0.1, 10.0);
   a.value     = a.quality * a.dd;    // AIR VALUE = Quality × DD（§17.5）
   a.stage     = 'landed';
 
@@ -1589,6 +1813,8 @@ function handleTurnInput(dir, tMs){
       if (!a.setDone) resolveAirSet(a, tMs);
       return;
     }
+    // 飛行中の前半 → グラブ（§17.7）。窓の外なら今まで通り着地入力に落ちる
+    if (canGrab(a)) { resolveAirGrab(a); return; }
     // 飛行中 → 着地入力。成立するのは 1 回だけ
     if (a.stage === 'flight' && a.result === null) { resolveAirLanding(a, tMs); return; }
   }
@@ -1756,7 +1982,10 @@ function computeAirScore(){
     seen[a.trick] = true;
     var v = (a.value === null || a.value === undefined) ? 0 : a.value;
     if (counted) sum += v;
-    return { index:a.index, trick:a.trick, label:a.label, dd:a.dd,
+    return { index:a.index, trick:a.trick, label:a.label, dd:a.dd, ddBase:a.ddBase,
+             bonusOn: !!a.bonusOn, bonusType: a.bonusType,
+             bonusLabel: a.bonusLabel, bonusEffect: a.bonusEffect,
+             bonusFactor: a.bonusFactor === undefined ? 1 : a.bonusFactor,
              result:a.result, quality:a.quality, value:a.value, deltaMs:a.deltaMs,
              setResult:a.setResult, setDeltaM:a.setDeltaM,
              setFactor:a.setFactor, qualityLanding:a.qualityLanding,
@@ -2015,7 +2244,8 @@ function spacingRangeText(){
      ★古くなっても消さない。runs だけだと自己ベストが押し出されて消えるため
    ・localStorage が使えない環境（プライベートブラウズ等）でも落ちないこと（§19.2）
    ========================================================================= */
-var TRICK_ABBR = { '360':'360', 'backFull':'BF', 'cork720':'CK' };
+var TRICK_ABBR = { spread:'SP', backScr:'BS', ironX:'IX',
+                   '360':'360', 'backFull':'BF', 'cork720':'CK' };
 var lastRunStamp = null;   // 直前に完走したランの時刻。ランキングで色を付けるため。
                            // G に持つと HOME や RETRY で消えるのでここに置く
 
@@ -2182,6 +2412,13 @@ function currentMaxScore(){
   var dd1  = (CONFIG.airTricks[CONFIG.selectedAir1] || {}).dd || 0;
   var dd2  = (CONFIG.airTricks[CONFIG.selectedAir2] || {}).dd || 0;
   var repeat = !CONFIG.airRepeatCounts && CONFIG.selectedAir1 === CONFIG.selectedAir2;
+  /* ★v7.0 グラブは常に狙えるので、上限にも入れる。入れないと脚注の「上限」が実際より低くなる。
+     ★v7.1 技ごとに扱いが違う：DD で効く技だけ足す。
+     Quality で効く技（バックフル）は Quality が 10.0 でクリップされるので上限は動かない。
+     掴めない技（スプレッド）は当然足さない */
+  var g1 = airBonusOf(CONFIG.selectedAir1), g2 = airBonusOf(CONFIG.selectedAir2);
+  if (g1 && g1.effect === 'dd') dd1 += CONFIG.grabDD;
+  if (g2 && g2.effect === 'dd') dd2 += CONFIG.grabDD;
   var ddSum  = repeat ? dd1 : dd1 + dd2;               // リピートは 2 本目がカウントされない（§18.3）
   var air    = clamp(ddSum * qMax, 0, CONFIG.airScoreMax);
   return {
@@ -2193,6 +2430,16 @@ function currentMaxScore(){
   };
 }
 window.currentMaxScore = currentMaxScore;
+
+/* スタート画面に出す、その技のグラブの説明（★v7.1。§17.7）。
+   技ごとに掴み方も効果も違うので、選んだ技に対して何が起きるかを滑る前に出す */
+function grabNoteOf(trickKey, n){
+  var g = airBonusOf(trickKey);
+  if (!g) return 'AIR ' + n + ' ボーナスなし';
+  return 'AIR ' + n + ' ' + g.label +
+    (g.effect === 'dd' ? ' DD+' + CONFIG.grabDD.toFixed(2)
+                       : ' 評価点×' + CONFIG.grabQuality.toFixed(2));
+}
 
 /* =========================================================================
    判定音（§20.6）
@@ -2442,8 +2689,8 @@ function tutEnter(i){
     // ★前にしか飛ばさない。後ろへ戻すと通過ずみのコブとエアの状態が壊れる
     var jump = a.dApproach - CONFIG.pxPerMeter * 6;
     if (G.playerD < jump) tutJumpTo(jump);
-    tutShow('エア ①セット', 'エア台が来ます。<em>リップの ' + CONFIG.airSetIdealM +
-            ' m 手前</em>で構えを作ります。', '止まったところがその位置です。', '', null);
+    tutShow('エア ①セット', 'エア台が来ます。<em>緑の SET ライン</em>で構えを作ります。',
+            '線がちょうど自分に重なったところです。台の根元と同じ位置です。', '', null);
   } else if (name === 'airLand') {
     T.scale = 0.5;
     T.air = a;
@@ -2522,7 +2769,7 @@ function tutPostMove(dt){
     if (a && !a.setDone && G.playerD >= a.dSet) {   // ★セットの理想位置ちょうどで止める
       G.playerD = a.dSet;
       T.wait = true;
-      tutShow('エア ①セット', 'いまタップ。<em>ここで構えを作ります</em>。',
+      tutShow('エア ①セット', 'いまタップ。<em>緑の SET ライン</em>が自分に重なりました。',
               'リップまであと ' + CONFIG.airSetIdealM + ' m。左右どちらをタップしても同じです。',
               'タップしてください', 'both');
     }
@@ -2652,7 +2899,9 @@ function showStartOverlay(){
   var t1 = CONFIG.airTricks[CONFIG.selectedAir1], t2 = CONFIG.airTricks[CONFIG.selectedAir2];
   document.getElementById('trickNote').textContent =
     'AIR 1 ' + t1.label + ' (DD ' + t1.dd.toFixed(2) + ')　/　AIR 2 ' +
-    t2.label + ' (DD ' + t2.dd.toFixed(2) + ')';
+    t2.label + ' (DD ' + t2.dd.toFixed(2) + ')' +
+    (CONFIG.grabOn ? '　※' + grabNoteOf(CONFIG.selectedAir1, 1) + ' / ' +
+                     grabNoteOf(CONFIG.selectedAir2, 2) : '');
   // この構成で狙える上限（§18.5）。難しい技を選ぶ理由が滑る前に分かるようにする
   var mx = currentMaxScore();
   document.getElementById('ovMax').textContent =
@@ -2769,19 +3018,32 @@ function showResult(){
     var sc = a.counted
       ? (a.value === null || a.value === undefined ? '0.00' : a.value.toFixed(2))
       : 'REPEAT';
-    return '<tr><td class="nm">AIR ' + a.index + '　' + a.label + '</td>' +
+    /* ★v7.0 グラブが成立した本は技名の横にグラブ名を出す。
+       ★v7.1 グラブは技ごとに名前が違う（セーフティ／ミュート）ので略さず出す。
+       DD で効く技は DD 列が上がり、Quality で効く技（バックフル）は Q 列が上がる */
+    var nm = 'AIR ' + a.index + '　' + a.label +
+             (a.bonusOn ? ' <b class="gb">+' + (a.bonusLabel || '') + '</b>' : '');
+    return '<tr><td class="nm">' + nm + '</td>' +
            '<td>' + a.dd.toFixed(2) + '</td><td>' + q + '</td>' +
            '<td class="' + (a.counted ? 'sc' : 'no') + '">' + sc + '</td></tr>';
   }).join('');
   // ★1 本を 1 行に収める。折り返すとリザルトが 2 行ぶん伸びて RETRY が押しにくくなる（§19.1）
   document.getElementById('resAir').innerHTML = s.airs.map(function(a){
     var land = a.result ? AIR_RESULT[a.result].label.replace(' LANDING', '') : '未通過';
+    /* ★v7.0 グラブはこの注記には出さない。上の表に「+G」と上がった DD が出ているので
+       情報は足りており、ここに足すと最悪ケース（PERFECT SET ＋ ずれ表示）が
+       1 行に収まらなくなる（§19.1。実測で 320〜390px すべて折り返した）。
+       ★NO SET を 'NO' と略すと 'NO GRAB' と読めてしまうので 'なし' にした */
     return 'AIR ' + a.index + '　' + land +
-      (a.setResult ? ' / ' + SET_LABEL[a.setResult].replace(' SET', '') +
+      (a.setResult ? ' / ' + SET_LABEL[a.setResult].replace(' SET', '').replace('NO', 'なし') +
          (a.setDeltaM === null ? '' :
           ' ' + (a.setDeltaM >= 0 ? '+' : '') + a.setDeltaM.toFixed(2) + 'm') : '') +
+      /* ★v7.1 係数の掛け算ではなく「着地の Q → 最終の Q」で出す。
+         係数が 2 つ（セット × グラブ）になり、両方書くと 320px で折り返すため（§19.1）。
+         セットの係数はすぐ左の SET の結果（PERFECT/GOOD/なし）と 1 対 1 なので情報は落ちていない。
+         ★表の Q 列とこの右側の数字が必ず一致する。一致しない書き方にはしないこと */
       (a.quality === null ? '' :
-        '　Q ' + a.qualityLanding.toFixed(1) + '×' + a.setFactor.toFixed(2) +
+        '　Q ' + a.qualityLanding.toFixed(1) + '→' + a.quality.toFixed(1) +
         (a.deltaMs === null ? ''
                             : '　' + (a.deltaMs >= 0 ? '+' : '') + a.deltaMs.toFixed(0) + 'ms'));
   }).join('<br>');
@@ -3191,6 +3453,45 @@ function drawAirZone(zone, cx, judgeY){
     ctx.textAlign = 'left';
   }
   if (hasJump) drawAirJump(cx, judgeY, zoneAir);
+  if (zoneAir) drawAirSetMark(cx, judgeY, zoneAir);   // ★台より後（台に塗りつぶされるため）
+  if (zoneAir) drawGrabCue(cx, judgeY, zoneAir);
+}
+
+/* セットの目印（★v7.0。§17.3.3）。判定には一切関与しない純粋な視覚表現。
+   ★これを入れた理由：試遊で「エア台まわりで必ず失敗する」という声が複数あった。
+   実測すると GOOD SET の窓は中級で ±251ms、超級で ±193ms しかないのに、
+   画面には「どこで押すのか」を示すものが何も無かった。着地は地面が近づくのが見えるが、
+   セットは見えない目標を勘で押していた。ターンに TURN JUDGE LINE があるのと同じ言語で線を引く。
+   ★窓そのものは広げていない。難易度は変えずに「見えるようにしただけ」。
+   ★エア台（ランプ）より後に描くこと。airSetIdealM と airTakeoffM がどちらも 2m で
+   セット地点＝台の根元なので、先に描くと台に塗りつぶされる（v7.0 で踏んだ）。
+   ★ラベルは中央に置かない。中央は台の面と重なって読めない。左端に出す */
+function drawAirSetMark(cx, judgeY, a){
+  if (!CONFIG.airSetMarkOn) return;
+  if (!a || a.setDone || a.result !== null) return;
+  var ppm0  = CONFIG.pxPerMeter;
+  var ySet  = judgeY - (a.dSet - G.playerD);
+  var yTopS = judgeY - (a.dSet + CONFIG.airSetGoodM * ppm0 - G.playerD);   // GOOD 窓の奥（画面の上）
+  var yBotS = judgeY - (a.dSet - CONFIG.airSetGoodM * ppm0 - G.playerD);   // GOOD 窓の手前（画面の下）
+  if (yTopS > view.H + 40 || yBotS < -40) return;
+  var hwS = CONFIG.courseHalfWidth * persp(ySet);
+  ctx.save();
+  // GOOD SET の帯
+  ctx.fillStyle = 'rgba(45,170,130,.16)';
+  ctx.fillRect(cx - hwS, yTopS, hwS * 2, yBotS - yTopS);
+  // PERFECT SET の線
+  ctx.strokeStyle = 'rgba(16,140,100,.95)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - hwS * 0.92, ySet);
+  ctx.lineTo(cx + hwS * 0.92, ySet);
+  ctx.stroke();
+  // ラベル（左端）。TURN JUDGE LINE と同じ置き方にして、同じ種類の目印だと分かるようにする
+  ctx.fillStyle = 'rgba(16,140,100,.95)';
+  ctx.font = '700 10px ui-monospace,Consolas,monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('SET', cx - hwS * 0.92 + 2, ySet - 4);
+  ctx.restore();
 }
 
 /* エア台と着地帯（§17.3）。判定には関与しない純粋な視覚表現 */
@@ -3255,6 +3556,30 @@ function drawAirJump(cx, judgeY, a){
   ctx.moveTo(cx - hwTop, yLip - lipH);
   ctx.lineTo(cx + hwTop, yLip - lipH);
   ctx.stroke();
+}
+
+/* グラブの窓が開いていることを知らせる（★v7.0。§17.7）。描画のみ。
+   ★これが無いとグラブの存在に気づけない。選手の左側に出す（右手で掴むので反対側）*/
+function drawGrabCue(cx, judgeY, a){
+  if (!a || !CONFIG.grabOn || !CONFIG.grabCueOn) return;
+  if (!canGrab(a)) return;
+  var txt = airBonusCue(airBonusOf(a.trick));
+  if (!txt) return;
+  var y = judgeY - 52;
+  var k = 0.55 + 0.45 * Math.sin(G.time * 9);      // 点滅させて「今だ」と分かるようにする
+  ctx.save();
+  ctx.globalAlpha = k;
+  ctx.font = '700 11px ui-monospace,Consolas,monospace';
+  // ★文字幅に合わせて枠を作る。固定幅だと SAFETY のような長い名前がはみ出す（v7.2 で踏んだ）
+  var tw = ctx.measureText(txt).width;
+  var bw = tw + 14, bx = cx - 34 - bw;            // 選手の左側に置く
+  ctx.fillStyle = 'rgba(20,120,90,.90)';
+  roundRect(bx, y - 10, bw, 18, 5); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText(txt, bx + bw / 2, y + 3);
+  ctx.textAlign = 'left';
+  ctx.restore();
 }
 
 /* フィニッシュライン */
@@ -3408,7 +3733,13 @@ function drawPlayer(cx, judgeY){
   var airRaise = 0;      // 万歳（両腕を上げて体を伸ばす）
   var airSide  = 0;      // 腕を体側に付ける（バックフル）
   var airKnee  = 0;      // 抱え込み（オフアクシス 720）
-  var airCross = 0;      // 板のクロス（オフアクシス 720）
+  var airCross = 0;      // 板のクロス（オフアクシス 720 / アイアンクロス）
+  var airCrossAng = CONFIG.airSkiCross;  // クロスの角度(rad)。技で変える
+  var airLegSpread = 0;  // 大の字（スプレッドイーグル）
+  var airSkiKick  = 0;   // テールの跳ね上げ（バックスクラッチャー）
+  var airGrab     = 0;   // グラブ（★v7.0）
+  var airGrabSki  = 1;   // ★v7.1 どちらの板を掴むか（+1 同じ側＝セーフティ／−1 反対側＝ミュート）
+  var airGrabDy   = CONFIG.grabSafetyDy;   // ★v7.1 ブーツの前か後ろか
   var airSpreadPx = CONFIG.airArmSpread;   // 技ごとの腕の開き量（★v6.6）
   var pitchSy  = 1;      // 前後回転の縦の潰れ（負なら上下が入れ替わる＝逆さ）
   if (air) {
@@ -3464,8 +3795,10 @@ function drawPlayer(cx, judgeY){
     // ★v6.4: air.rot は「回った回数」（= ease × max(flip,yaw)）。
     //   これをそのまま flip / yaw に掛けると二重に増えて、CORK 720 が
     //   縦軸 4 回転・前後 2 回転になっていた。0〜1 の進み具合に直してから掛ける
-    var maxSpin = Math.max(spin.flip, spin.yaw) || 1;
-    var e     = clamp(air.rot / maxSpin, 0, 1);
+    // ★v7.0 回転しない技（アップライト）は rot が常に 0 なので、形の進みは poseE で持つ
+    var maxSpin = Math.max(spin.flip, spin.yaw);
+    var e     = maxSpin > 0 ? clamp(air.rot / maxSpin, 0, 1) : clamp(air.poseE, 0, 1);
+    if (maxSpin <= 0) maxSpin = 1;
     var flipA = e * spin.flip * Math.PI * 2;
     var flipT = Math.round(flipA / (Math.PI * 2)) * Math.PI * 2;   // 一番近い「回り切った」姿勢
     var yawA  = e * spin.yaw * Math.PI * 2;
@@ -3488,7 +3821,19 @@ function drawPlayer(cx, judgeY){
     airRaise  = Math.max(airRaise, clamp(1 - e / CONFIG.airRaiseFade, 0, 1)) *
                 (spin.raise === undefined ? 1 : spin.raise) * (1 - open);
     airCross  = (spin.cross || 0) * Math.pow(peak, 1.3) * (1 - open);
+    airCrossAng = spin.crossAngle === 'iron' ? CONFIG.airIronCross : CONFIG.airSkiCross;
     airSpreadPx = (spin.armSpread === undefined) ? CONFIG.airArmSpread : spin.armSpread;
+    // ★v7.0 アップライトの形。peak と同じ「出して戻す」動きにする
+    airLegSpread = (spin.legSpread || 0) * Math.pow(peak, 1.2) * (1 - open);
+    airSkiKick   = (spin.skiKick  || 0) * Math.pow(peak, 1.2) * (1 - open);
+    // ★v7.0 グラブ。掴んだら着地入力まで保つので peak では出し入れしない
+    // ★kind が無い技（バックフル）は姿勢を変えない。掴んだ判定だけが立つ
+    airGrab   = (air.bonusOn && air.bonusKind ? air.grabT : 0) * (1 - open);
+    // ★v7.1 セーフティとミュートで掴む場所が違う（§17.7）
+    airGrabSki = (air.bonusKind === 'mute') ? -1 : 1;
+    airGrabDy  = (air.bonusKind === 'mute') ? CONFIG.grabMuteDy : CONFIG.grabSafetyDy;
+    // ★v7.1 開いた腕を下ろすのは掴む側だけ。両腕とも下ろすと左右対称のままで、
+    //   「片手で掴んでいる」ことが読めない（v7.0 のバックスクラッチャーがそうなっていた）
 
     // ★前後回転（バックフル）。真後ろから見た宙返りは横に回らず、
     //   体が縦に潰れて上下が入れ替わる。cos が負になった区間が「逆さ」
@@ -3544,19 +3889,29 @@ function drawPlayer(cx, judgeY){
        判定・採点には一切関係しない。 */
   var W = CONFIG.wear;
   // ★v6.4 抱え込み。板とブーツと脚だけを持ち上げる（腰から上はそのまま）
-  var footYd = footY - airKnee * CONFIG.airTuckLift;
+  var footYd = footY - airKnee * CONFIG.airTuckLift
+                     - airSkiKick * CONFIG.airSkiKickLift;   // ★v7.0 テールの跳ね上げで足元が上がる
+  var legOut = airLegSpread * CONFIG.airLegSpreadX;          // ★v7.0 大の字で脚が外へ開く量
+  var skiOut = airLegSpread * CONFIG.airLegSpreadSki;
 
   // 1. スキー（ターン方向へエッジング）。上面が見える角度なので、天面を明るい色で乗せる
   ctx.save();
   ctx.translate(footX, footYd);
   ctx.rotate(p.lean * CONFIG.edgeAngle);
   for (var sk = -1; sk <= 1; sk += 2) {
-    var sxc = sk * CONFIG.skiGap;             // 板の中心。★モーグルは板を閉じて滑る
+    var sxc = sk * (CONFIG.skiGap + skiOut);  // 板の中心。★モーグルは板を閉じて滑る
     ctx.save();
     // ★v6.5 抱え込みに合わせて板をクロスさせる。ブーツを軸にトップを内側へ振る
+    // ★v7.0 アイアンクロスも同じ仕組み。角度だけ深くする（airCrossAng）
     if (airCross > 0.001) {
       ctx.translate(sxc, -6);
-      ctx.rotate(sk * airCross * CONFIG.airSkiCross);
+      ctx.rotate(sk * airCross * airCrossAng);
+      ctx.translate(-sxc, 6);
+    }
+    // ★v7.0 バックスクラッチャー。ブーツを軸にテール（上）を外へ倒して跳ね上げて見せる
+    if (airSkiKick > 0.001) {
+      ctx.translate(sxc, -6);
+      ctx.rotate(-sk * airSkiKick * CONFIG.airSkiKickAngle);
       ctx.translate(-sxc, 6);
     }
     ctx.fillStyle = W.ski;
@@ -3577,7 +3932,7 @@ function drawPlayer(cx, judgeY){
   ctx.lineJoin = 'round';
   for (var li = -1; li <= 1; li += 2) {
     var hx = hipX + li * CONFIG.legGap,  hy = hipY;
-    var bx = footX + li * CONFIG.footGap, by = footYd - 3;
+    var bx = footX + li * (CONFIG.footGap + legOut), by = footYd - 3;   // ★v7.0 大の字
     var kx = hx + (bx - hx) * kneeT + li * kneeLift * CONFIG.kneeOut;
     var ky = hy + (by - hy) * kneeT - kneeLift * CONFIG.kneeUp;
     // ★白いウェアは雪に溶けるので、輪郭 → 本体 → 影側 の順で重ねる
@@ -3596,7 +3951,7 @@ function drawPlayer(cx, judgeY){
   ctx.translate(footX, footYd);
   ctx.rotate(p.lean * CONFIG.edgeAngle);
   ctx.fillStyle = W.boot;
-  var bw = 6.0, bg = CONFIG.skiGap;
+  var bw = 6.0, bg = CONFIG.skiGap + skiOut;      // ★v7.0 板と一緒に開く
   roundRect(-bg - bw / 2, -6.0, bw, 10.5, 2.4); ctx.fill();
   roundRect( bg - bw / 2, -6.0, bw, 10.5, 2.4); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.18)';               // 甲に当たる光
@@ -3644,8 +3999,10 @@ function drawPlayer(cx, judgeY){
     var tipX  = torsoX + ai * (27.0 + on * 6.0);
     var tipY  = shoY + 33.0 + on * CONFIG.polePlantDrop;
     // ★v6.3: 空中では腕とストックを外へ開く（実写のコマ送りがそうなっている）
-    if (airSpread > 0.001) {
-      var k = airSpread;
+    // ★v7.1 掴む側（右腕）はグラブの進み具合だけ開きを戻す
+    var spreadK = airSpread * (ai === 1 ? (1 - airGrab) : 1);
+    if (spreadK > 0.001) {
+      var k = spreadK;
       handX += ai * airSpreadPx * k;
       handY -= CONFIG.airArmLift * k;
       tipX  += ai * airSpreadPx * 1.5 * k;
@@ -3658,6 +4015,21 @@ function drawPlayer(cx, judgeY){
       handY += (shoY - 15.0        - handY) * r;
       tipX  += (torsoX + ai * 12.0 - tipX)  * r;
       tipY  += (shoY - 40.0        - tipY)  * r;
+    }
+    /* ★v7.0 グラブ（§17.7）。手を板まで下ろして掴む。
+       グラブは片手で足りるので、掴むのは右手だけにする。
+       両手を下ろすと「抱え込み」に見えてしまい、グラブだと読めない。
+       ★v7.1 セーフティ＝同じ側の板のブーツの後ろ／ミュート＝体をまたいで反対側の板の前。
+         ミュートでは腕が体の前を横切るので、真後ろからでも「またいでいる」ことが読める */
+    if (airGrab > 0.001 && ai === 1) {
+      var gk  = airGrab * CONFIG.grabReach;
+      // ★板の「外側の面」に手を置く。板の中心ちょうどだと脚に隠れて手が見えない
+      var gsx = footX + airGrabSki * (CONFIG.skiGap + skiOut + CONFIG.grabOutX);
+      handX += (gsx - handX) * gk;
+      handY += (footYd + airGrabDy - handY) * gk;
+      // ストックは掴んだ手から下へ流す（握ったまま垂れる）
+      tipX  += (gsx + airGrabSki * 13 - tipX) * gk;
+      tipY  += (footYd + airGrabDy + 18 - tipY) * gk;
     }
     // ★v6.4 腕を体側に付ける（バックフルのピーク）
     if (airSide > 0.001) {
