@@ -296,15 +296,17 @@
   .spBand.hidden{display:none;}
   .spLbl{font-size:8px;letter-spacing:.24em;color:#5f88ab;margin-bottom:6px;}
   .spRow{display:flex;gap:7px;justify-content:center;}
-  .spSlot{flex:1 1 0;min-width:0;height:42px;border-radius:8px;overflow:hidden;
+  /* ★v7.4 42px だとロゴが高さで縮んで英字が読めない。実ロゴが入ったので 54px へ */
+  .spSlot{flex:1 1 0;min-width:0;height:54px;border-radius:8px;overflow:hidden;
     display:flex;flex-direction:column;align-items:center;justify-content:center;}
   .spSlot.empty{border:1px dashed rgba(143,180,212,.42);background:rgba(143,180,212,.06);}
-  .spSlot.filled{background:rgba(255,255,255,.92);padding:5px;}
+  /* ★v7.4 純白にする。ロゴ画像の白背景と地の色が違うと、画像の縁が四角く浮いて見える */
+  .spSlot.filled{background:#ffffff;padding:5px;}
   .spSlot img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
   .spK{font-size:8px;letter-spacing:.18em;color:#8fb4d4;font-weight:800;line-height:1.3;}
   .spV{font-size:8px;color:#5f88ab;line-height:1.4;margin-top:2px;}
   #stage.shortres .spBand{margin-top:9px;padding-top:6px;}
-  #stage.shortres .spSlot{height:34px;}
+  #stage.shortres .spSlot{height:44px;}
   #resRepeat{color:#e0a33a;}
   #resRepeat:empty{display:none;}
 
@@ -484,8 +486,9 @@
         <div class="helpP">飛んだ直後に技の名前が出ている間にタップすると成立する。
         そのあと、いつも通り着地のタップをする。押さなくてもよい。<br>
         <em>グラブ（板をつかむ）</em>…バックスクラッチャーは<em>セーフティ</em>（同じ側の板の後ろ）、
-        アイアンクロス・360・コーク720 は<em>ミュート</em>（体をまたいで反対側の板の前）。
-        どれも DD が上がる。<br>
+        360・コーク720 は<em>ミュート</em>（体をまたいで反対側の板の前）。どれも DD が上がる。<br>
+        <em>ダブル（技が発展する）</em>…アイアンクロスはこちら。タップすると<em>コザック</em>へ変わり、
+        1本のエアで技を2つ続けたことになる。DD は 0.41 → <em>0.55</em>。<br>
         <em>ホールド（形を保つ）</em>…バックフルはこちら。<em>グラブではない</em>ので
         空中の姿勢は変わらず、DD も上がらない。上がるのは<em>技の完成度（評価点）</em>だけ。<br>
         スプレッドは両腕を開くことが技なので<em>何もできない</em>。</div>
@@ -829,10 +832,19 @@ var CONFIG = {
      |---|---|---|---|---|
      | SPREAD | **なし** | — | — | 両腕を開くことが技そのものなので掴めない |
      | BACK SCR | grab | SAFETY | 変わる | DD +0.14 |
-     | IRON CROSS | grab | MUTE | 変わる | DD +0.14 |
+     | **IRON CROSS** | **double** | **KOSAK** | **2 つ目の技に発展する** | **DD 0.41 → 0.55** |
      | 360 | grab | MUTE | 変わる | DD +0.14 |
      | CORK 720 | grab | MUTE | 変わる | DD +0.14 |
      | **BACK FULL** | **hold** | **HOLD** | **変わらない** | **DD は上げない。Quality ×1.08** |
+
+     ★v7.3：アイアンクロスだけ `double`。**グラブではなく「技が発展する」**（Van 様の指定）。
+     1 本のエアでマニューバを 2 つ続けて出す＝アップライトのダブルであり、
+     **シングル → ダブルがアップライトの実際の上達の筋道**である（シングル → グラブではない）。
+     DD も FIS の表からそのまま出る:
+       Single 0.40 ＋ Iron Cross 0.01 = **0.41**
+       Double 0.53 ＋ Iron Cross 0.01 ＋ Kosak 0.01 = **0.55**
+     ★グラブの +0.14 は表に無い推定値だったが、ダブルは**表の値そのもの**。
+       偶然どちらも 0.55 になるので、点は変わらず根拠だけが確かになった
 
      ★★バックフルは**グラブではない**。「形を保って完成度（技のクオリティ）を上げる」入力である。
        (1) **画面のどこにも GRAB と出さないこと**（合図・成立表示・リザルトのすべて）
@@ -847,7 +859,9 @@ var CONFIG = {
   airBonusByTrick: {
     spread:   null,
     backScr:  { type:'grab', kind:'safety', label:'SAFETY', effect:'dd' },
-    ironX:    { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
+    // ★v7.3 アイアンクロス＋コザックのダブル。effect:'ddAbs' は DD を絶対値で置き換える
+    //   （加算ではない。ダブルは基礎点そのものが Single 0.40 → Double 0.53 に変わるため）
+    ironX:    { type:'double', kind:null, label:'KOSAK', effect:'ddAbs', dd:0.55, pose:'kosak' },
     '360':    { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
     cork720:  { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
     backFull: { type:'hold', kind:null,     label:'HOLD',   effect:'quality' }
@@ -985,6 +999,21 @@ var CONFIG = {
   airSkiKickLift:         26,   // バックスクラッチャーで板とブーツが上がる量(px)
   airSkiKickAngle:      0.30,   // バックスクラッチャーでテールが開く角度(rad)
   airIronCross:         0.95,   // アイアンクロスで板を交差させる角度(rad)。抱え込みより深い
+  /* ---- コザック（★v7.3。描画のみ）----
+     脚を前へ伸ばして上体を折り、両手でつま先を取りにいく形。
+     ★バックスクラッチャー（膝を曲げて板を後ろへ・腕は横）と見分けが付くことが要件。
+       見分けの手がかりは「膝を曲げない」と「両腕を前に出す」の 2 つ */
+  /* ---- コザック（★v7.3。描画のみ）----
+     ★Van 様提供の実写で確認した形：**脚を左右に大きく開いたまま持ち上げ、板が上外へ伸びる**。
+       上体は前へ折れ、腕は体の前へ下りる（横には開かない）。
+     ★スプレッドイーグルとの違いは 2 つ：①脚が高く上がる ②腕を横に開かない。
+       ここを外すと、ただのスプレッドに見える */
+  airKosakLift:           20,   // ブーツが上がる量(px)
+  airKosakOutLeg:         24,   // 脚とブーツが外へ開く量(px)
+  airKosakOutSki:         20,   // 板が外へ開く量(px)
+  airKosakSkiAngle:     2.25,   // 板を外へ倒す角度(rad)。130°前後で「上外へ伸びる」形になる。
+                                //   これより浅いと板が水平〜下向きになり、実写と形が変わる
+  airKosakFold:            7,   // 上体を折る量(px。肩と頭が腰へ近づく)
 
   // --- スポンサー枠（§21）---
   // ★ここは「データ」。コードにロゴを書かない。実ロゴを載せるときは
@@ -996,7 +1025,17 @@ var CONFIG = {
   sponsorLabelEmpty:     'SPONSOR',       // 空き枠だけのときの見出し
   sponsorWanted:         'SPONSOR WANTED',
   sponsorNote:           'この枠に協賛ロゴを掲載できます',
-  sponsors:              []     // 例: [{ name:'○○', img:'data:image/png;base64,...' }]
+  /* ★v7.4 協賛 1 社目が決まった（運動器ケア しまだ病院）。
+     ロゴの文字が黒いので、暗い帯の上にそのまま置くと読めない。**白いプレートに載せる**こと
+     （`.spSlot.filled` の背景）。★白を抜いた透過 PNG にするのは不可
+       ——ロゴの中の人型は「白地 ＋ 黒い輪郭」なので、白を抜くと人型に穴が空く。
+     ★画像は 320px 幅・64 色の PNG（表示幅の約 2 倍）。色数の少ない図なので減色しても劣化しない。
+     ★実在企業のロゴ。掲載をやめるときはこの配列から外す */
+  sponsors: [
+    { name: '運動器ケア しまだ病院',
+      alt:  '運動器ケア しまだ病院 SHIMADA HOSPITAL',
+      img:  'data:image/png;base64,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' }
+  ]
 };
 
 /* =========================================================================
@@ -1403,7 +1442,8 @@ function buildAir(zone, trickKey, index){
     bonusType: null,      // 'grab' | 'hold'（★v7.2。表示の言葉はこれで決まる）
     bonusKind: null,      // 'safety' | 'mute' | null（null は姿勢を変えない）
     bonusLabel: null,     // 'SAFETY' | 'MUTE' | 'HOLD'
-    bonusEffect: null,    // 'dd' | 'quality'
+    bonusEffect: null,    // 'dd' | 'ddAbs' | 'quality'
+    bonusPose: null,      // ★v7.3 ダブルの 2 つ目の技の姿勢（'kosak' など）
     bonusFactor: 1,       // Quality で効くボーナスの係数（着地の解決時に確定）
     grabT: 0,             // 手が板へ届くまでの進行 0〜1（描画のみ）
     // 回転のない技（アップライト）の形の進み。回転が 0 だと rot が使えないため（描画のみ）
@@ -1504,6 +1544,13 @@ var AIR_SPIN = {
     }
     if (bn && bn.type === 'grab' && !bn.kind) {
       invariantIssues.push(tk + ': type が grab なのに kind がありません（掴む場所が決まりません）');
+    }
+    // ★v7.3 ダブルは DD を絶対値で持つ。書き忘れると DD が上がらないまま表示だけ変わる
+    if (bn && bn.type === 'double' && !(bn.effect === 'ddAbs' && typeof bn.dd === 'number')) {
+      invariantIssues.push(tk + ': type が double なのに effect:ddAbs と dd がそろっていません');
+    }
+    if (bn && bn.type === 'double' && !bn.pose) {
+      invariantIssues.push(tk + ': type が double なのに pose がありません（2 つ目の技が描かれません）');
     }
   }
   for (var i = 0; i < invariantIssues.length; i++) {
@@ -1666,6 +1713,13 @@ function airBonusOf(trickKey){
    ★ここを共通化しておかないと、合図・成立表示・リザルトのどれかに GRAB が残る */
 function airBonusCue(b){  return b ? b.label : ''; }                       // 窓が開いている間の合図
 function airBonusDone(b){ return b ? (b.type === 'grab' ? b.label + ' GRAB!' : b.label + '!') : ''; }
+// スタート画面に出す効果の説明（★v7.3 で 3 種類になった）
+function airBonusEffectText(b){
+  if (!b) return '';
+  if (b.effect === 'dd')    return ' DD+' + CONFIG.grabDD.toFixed(2);
+  if (b.effect === 'ddAbs') return ' DD' + b.dd.toFixed(2) + '（ダブル）';
+  return ' 評価点×' + CONFIG.grabQuality.toFixed(2);
+}
 function canGrab(a){
   return !!a && !!airBonusOf(a.trick) && a.stage === 'flight' && a.result === null &&
          !a.bonusOn && !a.inputDone &&
@@ -1680,8 +1734,10 @@ function resolveAirGrab(a){
   a.bonusKind   = b.kind;      // 'safety' | 'mute' | null（null は姿勢を変えない）
   a.bonusLabel  = b.label;
   a.bonusEffect = b.effect;
-  // ★効果は技ごとに違う（§17.7）。DD で効く技と、Quality で効く技がある
-  if (b.effect === 'dd') a.dd = a.ddBase + CONFIG.grabDD;
+  a.bonusPose = b.pose || null;   // ★v7.3 2 つ目の技の姿勢（ダブルのとき）
+  // ★効果は技ごとに違う（§17.7）。DD を足す技／DD を置き換える技／Quality で効く技がある
+  if      (b.effect === 'dd')    a.dd = a.ddBase + CONFIG.grabDD;
+  else if (b.effect === 'ddAbs') a.dd = b.dd;      // ★ダブルは基礎点ごと変わるので絶対値
   // 'quality' の技は着地の解決時に係数として掛ける（DD は動かさない）
   showJudge({ label: airBonusDone(b), cls: 'r-perfect' });
   playAirSet();                              // 構えができたときと同じ合図（§20.6）
@@ -2417,8 +2473,8 @@ function currentMaxScore(){
      Quality で効く技（バックフル）は Quality が 10.0 でクリップされるので上限は動かない。
      掴めない技（スプレッド）は当然足さない */
   var g1 = airBonusOf(CONFIG.selectedAir1), g2 = airBonusOf(CONFIG.selectedAir2);
-  if (g1 && g1.effect === 'dd') dd1 += CONFIG.grabDD;
-  if (g2 && g2.effect === 'dd') dd2 += CONFIG.grabDD;
+  if (g1) { if (g1.effect === 'dd') dd1 += CONFIG.grabDD; else if (g1.effect === 'ddAbs') dd1 = g1.dd; }
+  if (g2) { if (g2.effect === 'dd') dd2 += CONFIG.grabDD; else if (g2.effect === 'ddAbs') dd2 = g2.dd; }
   var ddSum  = repeat ? dd1 : dd1 + dd2;               // リピートは 2 本目がカウントされない（§18.3）
   var air    = clamp(ddSum * qMax, 0, CONFIG.airScoreMax);
   return {
@@ -2436,9 +2492,7 @@ window.currentMaxScore = currentMaxScore;
 function grabNoteOf(trickKey, n){
   var g = airBonusOf(trickKey);
   if (!g) return 'AIR ' + n + ' ボーナスなし';
-  return 'AIR ' + n + ' ' + g.label +
-    (g.effect === 'dd' ? ' DD+' + CONFIG.grabDD.toFixed(2)
-                       : ' 評価点×' + CONFIG.grabQuality.toFixed(2));
+  return 'AIR ' + n + ' ' + g.label + airBonusEffectText(g);
 }
 
 /* =========================================================================
@@ -3738,6 +3792,7 @@ function drawPlayer(cx, judgeY){
   var airLegSpread = 0;  // 大の字（スプレッドイーグル）
   var airSkiKick  = 0;   // テールの跳ね上げ（バックスクラッチャー）
   var airGrab     = 0;   // グラブ（★v7.0）
+  var airKosak    = 0;   // コザック（★v7.3。ダブルの 2 つ目の技）
   var airGrabSki  = 1;   // ★v7.1 どちらの板を掴むか（+1 同じ側＝セーフティ／−1 反対側＝ミュート）
   var airGrabDy   = CONFIG.grabSafetyDy;   // ★v7.1 ブーツの前か後ろか
   var airSpreadPx = CONFIG.airArmSpread;   // 技ごとの腕の開き量（★v6.6）
@@ -3772,8 +3827,9 @@ function drawPlayer(cx, judgeY){
 
   var footY = 8;
   var hipY  = -CONFIG.hipHeight + comp + tkPose - buck;   // 沈むと脚が畳まれ、負なら伸び上がる
-  var shoY  = hipY - 18;
-  var headY = shoY - 9;
+  // ★v7.3 コザックは上体を折る。肩と頭を腰へ近づけると「つま先を取りにいく」形になる
+  var shoY  = hipY - 18 + airKosak * CONFIG.airKosakFold;
+  var headY = shoY - 9  + airKosak * CONFIG.airKosakFold * 0.45;
 
   ctx.save();
   ctx.translate(cx, judgeY);
@@ -3829,6 +3885,11 @@ function drawPlayer(cx, judgeY){
     // ★v7.0 グラブ。掴んだら着地入力まで保つので peak では出し入れしない
     // ★kind が無い技（バックフル）は姿勢を変えない。掴んだ判定だけが立つ
     airGrab   = (air.bonusOn && air.bonusKind ? air.grabT : 0) * (1 - open);
+    /* ★v7.3 ダブル。タップを境に 1 つ目の技から 2 つ目の技へ入れ替える。
+       grabT が 0→1 と進むので、そのまま持ち替えの進み具合として使える。
+       ★1 つ目を消しながら 2 つ目を出すこと。重ねると何をしているか読めない */
+    airKosak  = (air.bonusOn && air.bonusPose === 'kosak' ? air.grabT : 0) * (1 - open);
+    if (airKosak > 0.001) airCross = airCross * (1 - airKosak);   // アイアンクロスを解く
     // ★v7.1 セーフティとミュートで掴む場所が違う（§17.7）
     airGrabSki = (air.bonusKind === 'mute') ? -1 : 1;
     airGrabDy  = (air.bonusKind === 'mute') ? CONFIG.grabMuteDy : CONFIG.grabSafetyDy;
@@ -3890,9 +3951,13 @@ function drawPlayer(cx, judgeY){
   var W = CONFIG.wear;
   // ★v6.4 抱え込み。板とブーツと脚だけを持ち上げる（腰から上はそのまま）
   var footYd = footY - airKnee * CONFIG.airTuckLift
-                     - airSkiKick * CONFIG.airSkiKickLift;   // ★v7.0 テールの跳ね上げで足元が上がる
+                     - airSkiKick * CONFIG.airSkiKickLift    // ★v7.0 テールの跳ね上げで足元が上がる
+                     - airKosak  * CONFIG.airKosakLift;      // ★v7.3 コザックは脚を高く上げる
   var legOut = airLegSpread * CONFIG.airLegSpreadX;          // ★v7.0 大の字で脚が外へ開く量
   var skiOut = airLegSpread * CONFIG.airLegSpreadSki;
+  // ★v7.3 コザックは脚を左右に大きく開いたまま持ち上げる（実写どおり）
+  legOut += airKosak * CONFIG.airKosakOutLeg;
+  skiOut += airKosak * CONFIG.airKosakOutSki;
 
   // 1. スキー（ターン方向へエッジング）。上面が見える角度なので、天面を明るい色で乗せる
   ctx.save();
@@ -3914,6 +3979,12 @@ function drawPlayer(cx, judgeY){
       ctx.rotate(-sk * airSkiKick * CONFIG.airSkiKickAngle);
       ctx.translate(-sxc, 6);
     }
+    // ★v7.3 コザック。ブーツを軸に板を外へ大きく倒し、トップが上外へ伸びる形にする
+    if (airKosak > 0.001) {
+      ctx.translate(sxc, -6);
+      ctx.rotate(-sk * airKosak * CONFIG.airKosakSkiAngle);
+      ctx.translate(-sxc, 6);
+    }
     ctx.fillStyle = W.ski;
     skiPath(sxc, -13, 6.4, 45);               // ブーツより下（進行方向）を長く見せる
     ctx.fill();
@@ -3928,6 +3999,8 @@ function drawPlayer(cx, judgeY){
   //    線ではなく太さのある帯にして、外側に明るい面を入れる
   var kneeT = 0.52;
   var kneeLift = Math.max(0, p.comp) * (CONFIG.absorbEnabled ? 1 : 0);
+  // ★v7.3 コザックは脚を伸ばす。膝が曲がっているとバックスクラッチャーと区別が付かない
+  kneeLift *= (1 - airKosak);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (var li = -1; li <= 1; li += 2) {
@@ -4000,7 +4073,7 @@ function drawPlayer(cx, judgeY){
     var tipY  = shoY + 33.0 + on * CONFIG.polePlantDrop;
     // ★v6.3: 空中では腕とストックを外へ開く（実写のコマ送りがそうなっている）
     // ★v7.1 掴む側（右腕）はグラブの進み具合だけ開きを戻す
-    var spreadK = airSpread * (ai === 1 ? (1 - airGrab) : 1);
+    var spreadK = airSpread * (ai === 1 ? (1 - airGrab) : 1) * (1 - airKosak);
     if (spreadK > 0.001) {
       var k = spreadK;
       handX += ai * airSpreadPx * k;
@@ -4030,6 +4103,17 @@ function drawPlayer(cx, judgeY){
       // ストックは掴んだ手から下へ流す（握ったまま垂れる）
       tipX  += (gsx + airGrabSki * 13 - tipX) * gk;
       tipY  += (footYd + airGrabDy + 18 - tipY) * gk;
+    }
+    /* ★v7.3 コザック。両腕を前に出してつま先（板）を取りにいく。
+       ★グラブ（片腕だけ）と違い、ここは必ず両腕。片腕だとグラブに見えてしまう */
+    if (airKosak > 0.001) {
+      var kk = airKosak;
+      // ★実写では腕は横に開かず、体の前へ下りている。ここを開くとスプレッドに見える
+      // ★肩幅(±8.4)より内側に置くと腕が上体の輪郭に隠れる。少しだけ外に出す
+      handX += (torsoX + ai * 11.5 - handX) * kk;
+      handY += (hipY + 15.0        - handY) * kk;
+      tipX  += (torsoX + ai * 13.0 - tipX)  * kk;
+      tipY  += (hipY + 39.0        - tipY)  * kk;
     }
     // ★v6.4 腕を体側に付ける（バックフルのピーク）
     if (airSide > 0.001) {
