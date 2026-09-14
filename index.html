@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v7.6 -->
+<!-- MOGUL CHALLENGE v7.7 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -556,6 +556,9 @@
           <div class="sbBar"><i id="sbBarTime"></i></div></div>
       </div>
 
+      <!-- ★v7.7 協賛枠はスコアの直下。ボタンの下だと実機でスクロールしないと見えなかった -->
+      <div class="spBand" id="spResult"></div>
+
       <div class="resSecTitle">TURN の内訳<b id="resTurnSum"></b></div>
       <div class="resSec">
         <div class="resRow"><span class="rk">カービング <em style="color:#5f88ab">50%</em></span>
@@ -597,7 +600,6 @@
         <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
         <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
       </div>
-      <div class="spBand" id="spResult"></div>
       <div class="resNote" id="resFormula"></div>
     </div>
   </div>
@@ -3422,7 +3424,8 @@ function render(){
   ctx.fillStyle = 'rgba(20,70,120,.6)';
   ctx.font = '9px ui-monospace,Consolas,monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('TURN JUDGE LINE', cx - hwBot * 1.02, judgeY - 5);
+  // ★v7.7 狭い画面だと線の左端が画面外に出て、ラベルの頭が切れる。画面内に留める
+  ctx.fillText('TURN JUDGE LINE', Math.max(4, cx - hwBot * 1.02), judgeY - 5);
 
   // 雪しぶき
   for (var j = 0; j < G.particles.length; j++) {
@@ -3549,7 +3552,7 @@ function drawAirSetMark(cx, judgeY, a){
   ctx.fillStyle = 'rgba(16,140,100,.95)';
   ctx.font = '700 10px ui-monospace,Consolas,monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('SET', cx - hwS * 0.92 + 2, ySet - 4);
+  ctx.fillText('SET', Math.max(4, cx - hwS * 0.92 + 2), ySet - 4);
   ctx.restore();
 }
 
