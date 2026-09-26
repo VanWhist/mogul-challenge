@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v7.8 -->
+<!-- MOGUL CHALLENGE v8.0 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -158,6 +158,46 @@
   /* HOME はスタート画面に戻る副ボタン。RETRY より弱い見た目にする（§19.3） */
   .bigbtn.ghost{background:transparent;border:1px solid rgba(143,180,212,.55);color:#b9d2e6;}
   .bigbtn.ghost:active{background:rgba(143,180,212,.18);}
+  /* ===== ★v8.0 ツアー（§32）===== */
+  #tourSteps{display:flex;gap:5px;width:100%;max-width:320px;margin:0 0 8px;}
+  .tstep{flex:1 1 0;min-width:0;min-height:52px;appearance:none;border:1px solid rgba(143,180,212,.45);
+    background:transparent;color:#b9d2e6;border-radius:10px;padding:5px 2px;cursor:pointer;font-family:inherit;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25;}
+  .tstep .tn{font-size:10.5px;font-weight:800;letter-spacing:.02em;}
+  .tstep .ts{font-size:8px;font-weight:900;letter-spacing:.14em;margin-top:2px;color:#5f88ab;min-height:10px;}
+  .tstep.clear .ts{color:#2fb98a;}
+  .tstep.on{background:#2f9bff;border-color:#2f9bff;color:#fff;}
+  .tstep.on .ts{color:#dbeeff;}
+  .tstep.lock{opacity:.38;cursor:default;border-style:dashed;}
+  #tourInfo{margin-bottom:8px;}
+  #tourName{font-size:15px;font-weight:900;letter-spacing:.06em;}
+  #tourNote{font-size:10px;color:#b9d2e6;margin-top:3px;}
+  #tourMeta{font-size:9.5px;color:#8fb4d4;margin-top:4px;letter-spacing:.04em;}
+  #tourBest{font-size:9.5px;color:#ffd479;margin-top:2px;min-height:12px;}
+  #tourChamp{font-size:11px;font-weight:900;letter-spacing:.2em;color:#ffd479;margin:-8px 0 8px;}
+  #tourChamp:empty{display:none;}
+  #tourTricks1,#tourTricks2{justify-content:center;max-width:320px;}
+  #tourRepeat{font-size:9px;font-weight:800;letter-spacing:.04em;color:#e0a33a;height:12px;margin-bottom:2px;}
+  .newTag{font-style:normal;font-size:7.5px;font-weight:900;letter-spacing:.08em;color:#ffd479;margin-left:4px;}
+  .trickbtn.on .newTag{color:#fff6d8;}
+  #tourBtnRow,#tourSubRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  /* リザルトの順位表（ツアーのときだけ出す） */
+  #resTour{width:100%;margin-top:10px;}
+  #resTour:empty{display:none;}
+  .tsHead{font-size:12px;font-weight:900;letter-spacing:.06em;margin-bottom:5px;}
+  .tsHead.pass{color:#5fe0a8;}
+  .tsHead.fail{color:#ffd479;}
+  .tsRow{display:flex;align-items:center;font-size:11px;line-height:18px;padding:0 6px;border-radius:4px;}
+  .tsRow .rk{width:34px;text-align:right;color:#8fb4d4;flex:none;}
+  .tsRow .nm{flex:1;min-width:0;text-align:left;padding-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tsRow .sc{width:46px;text-align:right;font-variant-numeric:tabular-nums;flex:none;}
+  .tsRow.me{background:rgba(47,155,255,.30);font-weight:900;color:#fff;}
+  .tsRow.me .rk{color:#fff;}
+  .tsGap{font-size:9px;line-height:9px;color:#5f88ab;}
+  .tsLine{border-top:1px dashed #ffd479;margin:3px 0;position:relative;height:0;}
+  .tsLine span{position:absolute;right:4px;top:-6px;font-size:8px;line-height:11px;color:#ffd479;
+    background:#0b1826;padding:0 4px;letter-spacing:.06em;}
+  #resBtnRow .bigbtn.cmp{padding:12px 16px;letter-spacing:.06em;}
   #resBtnRow,#startBtnRow,#startSubRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   /* START は主操作なので単独の行。RANKING / HELP は 1 段下げて小さく（§19.5） */
   .bigbtn.sm{font-size:11px;padding:9px 14px;margin-top:9px;letter-spacing:.08em;}
@@ -465,6 +505,7 @@
       <button class="bigbtn" id="btnStart" type="button">START</button>
     </div>
     <div id="startSubRow">
+      <button class="bigbtn ghost sm" id="btnTour" type="button">TOUR</button>
       <button class="bigbtn ghost sm" id="btnTut"  type="button">TUTORIAL</button>
       <button class="bigbtn ghost sm" id="btnRank" type="button">RANKING</button>
       <button class="bigbtn ghost sm" id="btnHelp" type="button">HELP</button>
@@ -472,6 +513,35 @@
     </div>
     <div class="spBand" id="spTitle"></div>
     <div class="resNote">← / A ・ → / D ／ 画面左右タップ</div>
+  </div>
+
+  <!-- ★v8.0 ツアー画面（§32）。起動したときの入口。難易度ボタンは出さない（大会が決める） -->
+  <div class="overlay hidden" id="tourOverlay">
+    <div class="ovTitle">MOGUL CHALLENGE</div>
+    <div class="ovSub">TOUR</div>
+    <div id="tourChamp"></div>
+    <div id="tourSteps"></div>
+    <div id="tourInfo">
+      <div id="tourName"></div>
+      <div id="tourNote"></div>
+      <div id="tourMeta"></div>
+      <div id="tourBest"></div>
+    </div>
+    <div class="diffLbl">AIR 1 の技</div>
+    <div class="trickRow" id="tourTricks1"></div>
+    <div class="diffLbl" style="margin-top:7px">AIR 2 の技</div>
+    <div class="trickRow" id="tourTricks2"></div>
+    <div id="tourRepeat"></div>
+    <div id="tourBtnRow">
+      <button class="bigbtn" id="btnTourStart" type="button">START</button>
+    </div>
+    <div id="tourSubRow">
+      <button class="bigbtn ghost sm" id="btnFree"     type="button">FREE PLAY</button>
+      <button class="bigbtn ghost sm" id="btnTourTut"  type="button">TUTORIAL</button>
+      <button class="bigbtn ghost sm" id="btnTourHelp" type="button">HELP</button>
+      <button class="bigbtn ghost sm" id="btnSound2"   type="button">♪ ON</button>
+    </div>
+    <div class="spBand" id="spTour"></div>
   </div>
 
   <div id="tutSide"></div>
@@ -570,10 +640,13 @@
           <div class="sbBar"><i id="sbBarTime"></i></div></div>
       </div>
 
+      <!-- ★v8.0 ツアーのときだけ、ここに順位表が入る（§32.6）。フリープレイでは空で高さ 0 -->
+      <div id="resTour"></div>
       <!-- ★v7.8 並びは「スコア → RETRY / HOME → 協賛枠 → 内訳」。
            v7.7 で協賛枠をスコアの直下に入れたら RETRY が押し出され、320×568 で 50px・360×640 で 14px
            はみ出した（§19.1 違反）。ボタンと協賛枠を最初の画面に置き、読み物の内訳はその下に回す -->
       <div id="resBtnRow">
+        <button class="bigbtn" id="btnNext" type="button" hidden>次の大会へ</button>
         <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
         <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
       </div>
@@ -642,6 +715,30 @@ var CONFIG = {
   helpSeenKey:      'mogulChallenge.seenHelp.v1',  // あそびかたを見たかどうか（§19.5）
   // --- チュートリアル（§19.7）---
   tutSeenKey:       'mogulChallenge.seenTut.v1',   // チュートリアルを終えたかどうか
+
+  /* --- ★v8.0 ツアー（§32）---
+     大会が「コース長・難易度・使える技」を決める。難易度は既存の diffTuning の 4 段階をそのまま使い、
+     新しい判定窓や速度は作らない。コース長は 214〜270m（ゲート間隔の不変条件。§32.3）。
+     ★記録はフリープレイの records.v1 と混ぜない（コース長が違うので比較できない） */
+  tourStoreKey:     'mogulChallenge.tour.v1',
+  tour: [
+    { key:'bkyu', name:'B級大会', step:['B級','大会'], diff:'beginner', courseM:220,
+      note:'モーグル選手の第一歩。ここから始まります',
+      tricks:['spread','ironX'], a1:'spread', a2:'ironX', field:20, passRank:10,
+      names:['月岡 司','桐谷 陽','如月 輝','氷室 空','瀬川 環','天野 蛍','綾瀬 詩','雪村 岬','橘 伊織','真田 灯','桂木 泉','三雲 慧','鳴海 昴','東雲 巴','志賀 朔','葉山 雫','夏目 眞','麻生 暁','御影 澪'], scores:[87.40,81.26,76.67,73.17,68.78,65.48,62.28,57.10,51.57,45.00,44.16,42.97,42.13,40.17,38.86,37.42,35.18,33.86,31.80] },
+    { key:'akyu', name:'A級大会', step:['A級','大会'], diff:'intermediate', courseM:235,
+      note:'レベルの高い選手が集まる、ひとつ上の大会',
+      tricks:['spread','ironX','backScr','360'], a1:'ironX', a2:'360', field:24, passRank:8,
+      names:['久遠 光','秋月 翼','深町 瑞希','篠宮 渚','春日 薫','神崎 真琴','七瀬 千尋','藤堂 優','水瀬 歩','羽田 楓','月岡 司','桐谷 陽','如月 輝','氷室 空','瀬川 環','天野 蛍','綾瀬 詩','雪村 岬','橘 伊織','真田 灯','桂木 泉','三雲 慧','鳴海 昴'], scores:[90.60,84.91,80.65,77.54,73.36,70.37,67.46,64.10,63.87,62.74,61.00,60.11,57.69,55.58,53.79,50.51,48.19,45.42,41.66,39.06,35.32,31.38,27.90] },
+    { key:'zennihon', name:'全日本選手権', step:['全日本','選手権'], diff:'advanced', courseM:250,
+      note:'日本一を決める大会',
+      tricks:['spread','ironX','backScr','360','backFull'], a1:'360', a2:'backFull', field:30, passRank:12,
+      names:['桜井 蒼','柊 湊','早瀬 悠','真壁 樹','白石 晴','小野寺 律','千早 航','霧島 凛','宮坂 遥','立花 碧','朝比奈 葵','久遠 光','秋月 翼','深町 瑞希','篠宮 渚','春日 薫','神崎 真琴','七瀬 千尋','藤堂 優','水瀬 歩','羽田 楓','月岡 司','桐谷 陽','如月 輝','氷室 空','瀬川 環','天野 蛍','綾瀬 詩','雪村 岬'], scores:[93.05,89.89,87.37,85.88,83.01,81.38,79.75,77.09,76.43,74.90,73.11,72.20,71.50,70.47,69.66,67.11,65.57,63.48,60.24,58.28,55.00,51.49,48.93,44.69,41.10,37.71,32.82,29.16,24.60] },
+    { key:'wc', name:'ワールドカップ', step:['ワールド','カップ'], diff:'veryHard', courseM:270,
+      note:'世界のトップ選手が集まる、最高峰のシリーズ戦',
+      tricks:['spread','ironX','backScr','360','backFull','cork720'], a1:'backFull', a2:'cork720', field:30, passRank:6,
+      names:['J. HALVORSEN NOR','T. LACASSE CAN','M. DELANEY USA','S. VIRTANEN FIN','A. LINDQVIST SWE','A. ASAHINA JPN','P. MOREAU FRA','L. BRUNNER SUI','D. ORAZOV KAZ','E. WALSH AUS','R. KIRISHIMA JPN','F. HUBER AUT','M. KELLER GER','C. RINALDI ITA','H. SEO KOR','Y. LIN CHN','O. NYSTROM SWE','B. CARTER USA','G. TREMBLAY CAN','I. NOVAK CZE','V. SAAR EST','R. MCKENZIE NZL','J. LEROUX FRA','T. ANDERSEN NOR','K. HOLM SWE','M. ROSSI ITA','S. BAKER AUS','A. SEITOV KAZ','E. KOSKINEN FIN'], scores:[94.90,89.19,84.38,80.66,75.61,71.80,71.73,70.74,70.67,70.03,68.76,68.68,67.07,65.99,65.43,63.37,62.52,61.30,59.11,58.35,56.42,54.39,53.44,50.94,49.22,47.81,45.01,43.56,41.30] }
+  ],
   tutSlowScale:     0.42,   // 「ゆっくり」段階のスクロール倍率
   /* ★v7.8 チュートリアルは初級・B級と同じ技で行う（城さん指摘 2026-09-26）。
      それまでは選んでいた難易度（初めて開いたときは上級）で走り、止めて教える 2 本のあとに急に速くなっていた。
@@ -1242,6 +1339,7 @@ var elStartOv = document.getElementById('startOverlay');
 var elResultOv= document.getElementById('resultOverlay');
 var elRankOv  = document.getElementById('rankOverlay');
 var elHelpOv  = document.getElementById('helpOverlay');
+var elTourOv  = document.getElementById('tourOverlay');   // ★v8.0
 var elCountdn = document.getElementById('countdown');
 var elProgL   = document.getElementById('progLeft');
 var elProgR   = document.getElementById('progRight');
@@ -2043,6 +2141,9 @@ function finishRun(){
   // ★チュートリアルから続けたランはリザルトを出すが記録しない（止めてもらった PERFECT を含むため）
   if (G.fromTutorial) {
     G.pbInfo = { saved:false, rank:null, isPb:false, prevBest:null, stamp:null, tutorial:true };
+  } else if (TOUR.applied) {
+    // ★v8.0 ツアーのランは records.v1 に入れない。コース長が違い、フリープレイの記録と比べられない（§32.4）
+    G.pbInfo = tourPush(G.score);
   } else {
     G.pbInfo = recordsPush(G.score);
     lastRunStamp = G.pbInfo.stamp || null;
@@ -2231,25 +2332,31 @@ document.getElementById('btnStart').addEventListener('click',   function(){ star
 /* HOME（§19.3）— 滑走中でもリザルト表示中でも、確認なしでスタート画面へ戻す。
    このランは破棄する（記録は残さない）。押しっぱなしのキー／指の状態も必ず捨てる。 */
 function goHome(){
-  heldDirs.clear();
-  pointerDirs.clear();
-  resetGame();          // G を作り直す（phase は 'ready' に戻る）
-  showStartOverlay();
+  // ★v8.0 戻り先はツアー画面かスタート画面（§32.2）。showHome の中で G を作り直す
+  showHome();
 }
 window.goHome = goHome;
-document.getElementById('btnSound').addEventListener('click', function(){
+function onSoundBtn(){
   soundOn = !soundOn;
   soundSavePref();
-  this.textContent = '♪ ' + (soundOn ? 'ON' : 'OFF');
+  syncSoundBtns();
   if (soundOn) { soundUnlock(); setTimeout(function(){ playJudge('perfect'); }, 30); }   // 押した手応えを返す
-});
+}
+/* ★v8.0 音のボタンはスタート画面とツアー画面の 2 つ。表示を必ずそろえる */
+function syncSoundBtns(){
+  var t = '♪ ' + (soundOn ? 'ON' : 'OFF');
+  document.getElementById('btnSound').textContent  = t;
+  document.getElementById('btnSound2').textContent = t;
+}
+document.getElementById('btnSound').addEventListener('click',  onSoundBtn);
+document.getElementById('btnSound2').addEventListener('click', onSoundBtn);
 document.getElementById('btnTut').addEventListener('click',       startTutorial);
 document.getElementById('tutSkip').addEventListener('click',      endTutorial);
 document.getElementById('btnRank').addEventListener('click',      showRanking);
 document.getElementById('btnHelp').addEventListener('click',      showHelp);
 document.getElementById('btnHelpClose').addEventListener('click', function(){
   markHelpSeen();                  // 初回に読んだら次からは自動で出さない（§19.5）
-  showStartOverlay();
+  showHome();                      // ★v8.0 開いた画面（ツアー／フリープレイ）へ戻す
 });
 document.getElementById('btnRankClose').addEventListener('click', showStartOverlay);
 document.getElementById('btnHome').addEventListener('click',    goHome);
@@ -2299,12 +2406,298 @@ function showJudge(R){
   elJudge.className = 'hud show ' + R.cls;
 }
 
+/* =========================================================================
+   ★v8.0 ツアー（§32）
+   既存のフリープレイの上に「大会の設定」を一時的にかぶせる。
+   判定・採点・diffTuning・baseScroll・records.v1 には触れない。
+   ========================================================================= */
+var TOUR = {
+  mode:    'tour',   // 'tour' | 'free' … HOME で戻る先（§32.2）
+  applied: false,    // 大会の設定をかぶせているか
+  key:     null,     // 選んでいる大会
+  saved:   null,     // かぶせる前のフリープレイの設定（難易度・技）
+  picks:   {}        // 大会ごとに選んだ技（このセッションの間だけ覚える）
+};
+/* フリープレイのコース長（253m）。★戻すときはこの値に戻す（§32.4。戻し忘れると記録の比較が壊れる） */
+var FREE_COURSE_M = CONFIG.courseLengthM;
+
+function tourIdx(key){
+  for (var i = 0; i < CONFIG.tour.length; i++) if (CONFIG.tour[i].key === key) return i;
+  return -1;
+}
+function tourEv(key){ var i = tourIdx(key); return i >= 0 ? CONFIG.tour[i] : null; }
+
+function tourLoad(){
+  var db = { v: 1, cleared: [], best: {}, champion: false };
+  if (!recordsAvailable) return db;
+  try {
+    var raw = window.localStorage.getItem(CONFIG.tourStoreKey);
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && o.v === 1) {
+        if (o.cleared instanceof Array) db.cleared = o.cleared;
+        if (o.best && typeof o.best === 'object') db.best = o.best;
+        db.champion = !!o.champion;
+      }
+    }
+  } catch (e) { /* 壊れていたら既定値で続ける。消さない */ }
+  return db;
+}
+function tourSave(db){
+  if (!recordsAvailable) return false;
+  try { window.localStorage.setItem(CONFIG.tourStoreKey, JSON.stringify(db)); return true; }
+  catch (e) { return false; }
+}
+/* 解禁：先頭の大会と、ひとつ前の大会を通過した大会。
+   ★保存できない端末では全部選べる（進行を保存できないせいで先へ進めなくならないように。§32.4） */
+function tourUnlocked(i, db){
+  if (!recordsAvailable || i <= 0) return true;
+  return db.cleared.indexOf(CONFIG.tour[i - 1].key) >= 0;
+}
+/* 解禁済みのうち、いちばん先の大会。保存できない端末では先頭から */
+function tourFurthest(db){
+  if (!recordsAvailable) return CONFIG.tour[0].key;
+  var k = CONFIG.tour[0].key;
+  for (var i = 0; i < CONFIG.tour.length; i++) if (tourUnlocked(i, db)) k = CONFIG.tour[i].key;
+  return k;
+}
+
+/* 大会の設定をかぶせる。最初にかぶせるときだけフリープレイの設定を控える */
+function tourApply(key){
+  var ev = tourEv(key);
+  if (!ev) return;
+  if (!TOUR.applied) {
+    TOUR.saved = { diff: CONFIG.difficulty, a1: CONFIG.selectedAir1, a2: CONFIG.selectedAir2 };
+    TOUR.applied = true;
+  }
+  TOUR.key = key;
+  var pk = TOUR.picks[key] || { a1: ev.a1, a2: ev.a2 };   // 大会ごとの既定値（§32.3）
+  CONFIG.courseLengthM = ev.courseM;
+  CONFIG.difficulty    = ev.diff;
+  applyDifficultyTuning(ev.diff);
+  CONFIG.selectedAir1  = pk.a1;
+  CONFIG.selectedAir2  = pk.a2;
+}
+/* フリープレイの設定に戻す。★コース長は必ず FREE_COURSE_M（253m） */
+function tourUnapply(){
+  if (!TOUR.applied) return;
+  var sv = TOUR.saved || {};
+  CONFIG.courseLengthM = FREE_COURSE_M;
+  if (sv.diff) CONFIG.difficulty = sv.diff;
+  applyDifficultyTuning(CONFIG.difficulty);
+  if (sv.a1) CONFIG.selectedAir1 = sv.a1;
+  if (sv.a2) CONFIG.selectedAir2 = sv.a2;
+  TOUR.applied = false;
+  TOUR.saved = null;
+}
+
+/* HOME の行き先。ツアーで遊んでいたらツアー画面、フリープレイならスタート画面（§32.2） */
+function showHome(){
+  tutRestoreSettings();          // ★v7.8 チュートリアル用の設定を先に戻す
+  heldDirs.clear();
+  pointerDirs.clear();
+  if (TOUR.mode === 'tour') { showTourOverlay(); return; }
+  tourUnapply();
+  resetGame();
+  showStartOverlay();
+}
+window.showHome = showHome;
+function goFreePlay(){
+  tutRestoreSettings();
+  TOUR.mode = 'free';
+  tourUnapply();
+  resetGame();
+  showStartOverlay();
+}
+function goTour(){ TOUR.mode = 'tour'; showTourOverlay(); }
+
+function showTourOverlay(key){
+  tutRestoreSettings();          // ★v7.8 tourApply より前に戻す
+  TOUR.mode = 'tour';
+  var db = tourLoad();
+  var k = key || TOUR.key || tourFurthest(db);
+  var i = tourIdx(k);
+  if (i < 0 || !tourUnlocked(i, db)) k = tourFurthest(db);
+  tourApply(k);
+  resetGame();                 // 大会のコース長・難易度・技でコースを作り直す（hideOverlays も走る）
+  renderTour(db);
+  elTourOv.classList.remove('hidden');
+}
+window.showTourOverlay = showTourOverlay;
+
+/* スタート画面の技ボタンと同じ表記を使う（二重に書かない） */
+function trickShortLabel(t){
+  var b = document.querySelector('.trickbtn[data-air="1"][data-trick="' + t + '"]');
+  return b ? b.textContent : ((CONFIG.airTricks[t] || {}).label || t);
+}
+
+function renderTour(db){
+  var ev = tourEv(TOUR.key), idx = tourIdx(TOUR.key);
+  var prev = idx > 0 ? CONFIG.tour[idx - 1] : null;
+
+  // 大会の階段（§32.2）。未解禁はロック、通過済みは CLEAR
+  var h = '';
+  for (var i = 0; i < CONFIG.tour.length; i++) {
+    var e = CONFIG.tour[i], un = tourUnlocked(i, db), cl = db.cleared.indexOf(e.key) >= 0;
+    h += '<button class="tstep' + (e.key === TOUR.key ? ' on' : '') + (un ? '' : ' lock') +
+         (cl ? ' clear' : '') + '" type="button" data-tour="' + e.key + '"' + (un ? '' : ' disabled') + '>' +
+         '<span class="tn">' + e.step[0] + '<br>' + e.step[1] + '</span>' +
+         '<span class="ts">' + (cl ? 'CLEAR' : (un ? '' : 'LOCK')) + '</span></button>';
+  }
+  document.getElementById('tourSteps').innerHTML = h;
+  document.getElementById('tourChamp').textContent = db.champion ? '★ ツアー制覇 ★' : '';
+
+  document.getElementById('tourName').textContent = ev.name;
+  document.getElementById('tourNote').textContent = ev.note;
+  document.getElementById('tourMeta').textContent =
+    ev.courseM + ' m ・ 出場 ' + ev.field + ' 人 ・ ' + ev.passRank + ' 位以内で通過';
+  var best = db.best[ev.key];
+  document.getElementById('tourBest').textContent = !recordsAvailable ? 'この端末では記録を保存できません'
+    : (typeof best === 'number' ? '自己ベスト ' + best.toFixed(2) : 'はじめての出場');
+
+  // 使える技だけ出す。この大会で新しく使えるようになった技に NEW を付ける（§32.2）
+  var sel = { '1': CONFIG.selectedAir1, '2': CONFIG.selectedAir2 };
+  for (var slot = 1; slot <= 2; slot++) {
+    document.getElementById('tourTricks' + slot).innerHTML = ev.tricks.map(function(t){
+      var isNew = prev && prev.tricks.indexOf(t) < 0;
+      return '<button class="trickbtn' + ((CONFIG.airTricks[t] || {}).upright ? ' up' : '') +
+             (sel[slot] === t ? ' on' : '') + '" type="button" data-air="' + slot + '" data-trick="' + t + '">' +
+             trickShortLabel(t) + (isNew ? '<i class="newTag">NEW</i>' : '') + '</button>';
+    }).join('');
+  }
+  document.getElementById('tourRepeat').textContent =
+    (!CONFIG.airRepeatCounts && CONFIG.selectedAir1 === CONFIG.selectedAir2)
+      ? '同じ技の 2 本目は AIR SCORE に入りません（FIS のリピート規定）' : '';
+}
+
+(function(){
+  document.getElementById('tourSteps').addEventListener('click', function(e){
+    var b = e.target.closest('.tstep');
+    if (!b || b.disabled) return;
+    showTourOverlay(b.getAttribute('data-tour'));
+  });
+  function onTrick(e){
+    var b = e.target.closest('.trickbtn');
+    if (!b) return;
+    var slot = b.getAttribute('data-air'), t = b.getAttribute('data-trick');
+    if (slot === '2') CONFIG.selectedAir2 = t; else CONFIG.selectedAir1 = t;
+    TOUR.picks[TOUR.key] = { a1: CONFIG.selectedAir1, a2: CONFIG.selectedAir2 };
+    resetGame();
+    renderTour(tourLoad());
+    elTourOv.classList.remove('hidden');
+  }
+  document.getElementById('tourTricks1').addEventListener('click', onTrick);
+  document.getElementById('tourTricks2').addEventListener('click', onTrick);
+  document.getElementById('btnTourStart').addEventListener('click', function(){ startCountdown(); });
+  document.getElementById('btnFree').addEventListener('click', goFreePlay);
+  document.getElementById('btnTour').addEventListener('click', goTour);
+  document.getElementById('btnTourTut').addEventListener('click', function(){ startTutorial(); });
+  document.getElementById('btnTourHelp').addEventListener('click', function(){ showHelp(); });
+  document.getElementById('btnNext').addEventListener('click', function(){
+    // ★すぐ滑らせず、ツアー画面で次の大会を見せる。新しく使える技（NEW）に気づいてもらうため（§32.2）
+    var info = G.pbInfo;
+    showTourOverlay(info && info.next ? info.next : null);
+  });
+})();
+
+/* 順位（§32.5）。★同点は自分が上。固定の表なので、同じ点なら何度やっても同じ順位になる */
+function tourStandings(ev, total){
+  var rows = ev.scores.map(function(sc, i){ return { name: ev.names[i], score: sc }; });
+  rows.sort(function(a, b){ return b.score - a.score; });
+  var ahead = 0;
+  for (var i = 0; i < rows.length; i++) if (rows[i].score > total) ahead++;
+  return { rank: ahead + 1, rows: rows };
+}
+
+/* ツアーの 1 本を記録する。★records.v1 には入れない（§32.4） */
+function tourPush(s){
+  var ev = tourEv(TOUR.key), idx = tourIdx(TOUR.key);
+  var total = +s.totalScore.toFixed(2);
+  var st = tourStandings(ev, total);
+  var passed = st.rank <= ev.passRank;
+  // 通過ラインの点＝他の選手だけで並べたときの passRank 位。同点なら通過なので、これに並べばよい
+  var lineScore = st.rows[ev.passRank - 1].score;
+  var need = passed ? 0 : Math.max(0.01, +(lineScore - total).toFixed(2));
+  var db = tourLoad();
+  var prevBest = typeof db.best[ev.key] === 'number' ? db.best[ev.key] : null;
+  var isPb = prevBest === null || total > prevBest;
+  if (isPb) db.best[ev.key] = total;
+  var newClear = passed && db.cleared.indexOf(ev.key) < 0;
+  if (newClear) db.cleared.push(ev.key);
+  var last = idx === CONFIG.tour.length - 1;
+  var champNow = passed && last && !db.champion;
+  if (passed && last) db.champion = true;
+  var saved = tourSave(db);
+  return { tour: true, key: ev.key, total: total, rank: st.rank, rows: st.rows,
+           field: ev.field, passRank: ev.passRank, passed: passed, need: need, lineScore: lineScore,
+           prevBest: prevBest, isPb: isPb, saved: saved, newClear: newClear,
+           champion: passed && last, champNow: champNow,
+           next: (passed && !last) ? CONFIG.tour[idx + 1].key : null };
+}
+
+function tourPbLine(info){
+  if (!info.saved) return { text: 'この端末では記録を保存できません', sub: true };
+  if (info.isPb && info.prevBest === null) return { text: '★ この大会の初記録', sub: false };
+  if (info.isPb) return { text: '★ この大会の自己ベスト更新（これまで ' + info.prevBest.toFixed(2) + '）', sub: false };
+  return { text: 'この大会の自己ベストは ' + info.prevBest.toFixed(2), sub: true };
+}
+
+/* 順位表（§32.6）。★自分の前後 2 人と通過ラインだけ。全員は出さない（画面が足りない） */
+function tourTableHtml(info){
+  var me = { name: 'あなた', score: info.total, me: true };
+  var list = info.rows.slice();
+  list.splice(info.rank - 1, 0, me);                      // 同点は自分が上なので、この位置でよい
+  var N = list.length, meI = info.rank - 1, lineI = info.passRank - 1;
+  var a = Math.max(0, meI - 2), b = Math.min(N - 1, meI + 2);
+  if (b - a < 4) { if (a === 0) b = Math.min(N - 1, 4); else a = Math.max(0, b - 4); }
+  // 通過ラインが窓のすぐ外なら窓を 1 行広げる（「⋯」を挟むより読みやすい）
+  if (lineI === a - 1) a--;
+  if (lineI === b + 1) b++;
+  function row(i){
+    var r = list[i];
+    return '<div class="tsRow' + (r.me ? ' me' : '') + '"><span class="rk">' + (i + 1) + '位</span>' +
+           '<span class="nm">' + spEsc(r.name) + '</span><span class="sc">' + r.score.toFixed(2) + '</span></div>';
+  }
+  var LINE = '<div class="tsLine"><span>通過ライン</span></div>', GAP = '<div class="tsGap">⋮</div>';
+  var h = '';
+  if (lineI < a) h += row(lineI) + LINE + GAP;
+  for (var i = a; i <= b; i++) { h += row(i); if (i === lineI) h += LINE; }
+  if (lineI > b) h += GAP + row(lineI) + LINE;
+
+  var head = info.champion
+    ? '<div class="tsHead pass">★ ツアー制覇！　' + info.rank + ' 位 / ' + info.field + ' 人</div>'
+    : info.passed
+      ? '<div class="tsHead pass">通過！　' + info.rank + ' 位 / ' + info.field + ' 人</div>'
+      : '<div class="tsHead fail">' + info.rank + ' 位 / ' + info.field + ' 人　あと ' +
+        info.need.toFixed(2) + ' 点で通過</div>';
+  return head + h;
+}
+
+/* リザルトのボタンと順位表を、ツアーとフリープレイで切り替える */
+function renderResultMode(s){
+  var info = G.pbInfo, bNext = document.getElementById('btnNext'),
+      bRetry = document.getElementById('btnRetry'), bHome = document.getElementById('btnResHome');
+  var tour = !!(info && info.tour);
+  document.getElementById('resTour').innerHTML = tour ? tourTableHtml(info) : '';
+  bNext.hidden = !(tour && info.next);
+  bRetry.textContent = tour ? 'もう一度' : 'RETRY';
+  // 通過したら「次の大会へ」を主ボタンにする。届かなかったら「もう一度」が主（§32.6）
+  bRetry.classList.toggle('ghost', tour && !!info.next);
+  var cmp = tour;
+  bNext.classList.toggle('cmp', cmp); bRetry.classList.toggle('cmp', cmp); bHome.classList.toggle('cmp', cmp);
+  if (tour) {
+    var ev = tourEv(info.key);
+    document.getElementById('resDiff').textContent = ev.name + '　COURSE ' + s.mogulCount + ' TURNS';
+  }
+}
+
 /* ---- オーバーレイ（§19.2）---- */
 function hideOverlays(){
   elStartOv.classList.add('hidden');
   elResultOv.classList.add('hidden');
   elRankOv.classList.add('hidden');
   elHelpOv.classList.add('hidden');
+  elTourOv.classList.add('hidden');
   elCountdn.classList.add('hidden');
 }
 
@@ -2436,6 +2829,7 @@ function trickPair(e){
 /* リザルトに出す 1 行（§19.4）。行が空なら CSS で消えるのでリザルトは高くならない */
 function pbLineText(info){
   if (!info) return { text:'', sub:false };
+  if (info.tour)          return tourPbLine(info);
   if (info.tutorial)      return { text:'練習ランのため記録には残していません', sub:true };
   if (!info.saved)        return { text:'この端末では記録を保存できません', sub:true };
   if (info.isPb && info.prevBest === null)
@@ -3004,8 +3398,7 @@ function endTutorial(){
   elTutSkip.classList.remove('on');
   tutHideSide();
   markTutSeen();
-  resetGame();
-  showStartOverlay();
+  showHome();          // ★v8.0 初回はチュートリアル → ツアー画面（§32.2）。中で G を作り直す
 }
 window.endTutorial = endTutorial;
 
@@ -3023,6 +3416,7 @@ function showHelp(){
   elStartOv.classList.add('hidden');
   elResultOv.classList.add('hidden');
   elRankOv.classList.add('hidden');
+  elTourOv.classList.add('hidden');
   elHelpOv.classList.remove('hidden');
 }
 window.showHelp = showHelp;
@@ -3220,6 +3614,7 @@ function showResult(){
     'TURN ' + CONFIG.turnScoreMax + ' ＋ AIR ' + CONFIG.airScoreMax +
     ' ＋ TIME ' + CONFIG.timeScoreMax + ' ＝ ' + CONFIG.totalScoreMax +
     '（この構成の上限は ' + mxNow.total.toFixed(1) + '）';
+  renderResultMode(s);                               // ★v8.0 ツアーなら順位表とボタン
   elResultOv.classList.remove('hidden');
 }
 
@@ -4538,7 +4933,7 @@ resize();
 renderSponsors();
 // 判定音（§20.6）。前回の設定を読み、ボタンの表示を合わせる
 soundOn = soundLoadPref();
-document.getElementById('btnSound').textContent = '♪ ' + (soundOn ? 'ON' : 'OFF');
+syncSoundBtns();
 document.getElementById('btnStart').addEventListener('click', soundUnlock);
 document.getElementById('btnRetry').addEventListener('click', soundUnlock);
 
@@ -4549,11 +4944,62 @@ if (!debugMode) {
   document.getElementById('btnDebug').style.display   = 'none';
 }
 
+/* ★v8.0 ツアーの表の検査（§32.3 / §22.1）。読み込み時の checkInvariants は CL 253m でしか走らないので、
+   4 大会の（コース長, 難易度）で見直す。
+   §22.1 の不等式は難易度だけで決まり（コース長に依らない）、4 難易度とも checkInvariants で検査ずみ。
+   ここでは、その難易度が diffTuning にあること・コース長で変わるゲート間隔・表の中身を検査する */
+(function checkTourTables(){
+  var issues = [], lines = [];
+  var gateM = CONFIG.gateEveryGaps * CONFIG.mogulSpacingM;
+  var keep = { a1: CONFIG.selectedAir1, a2: CONFIG.selectedAir2 };
+  for (var i = 0; i < CONFIG.tour.length; i++) {
+    var ev = CONFIG.tour[i], tag = ev.key;
+    if (!CONFIG.diffTuning[ev.diff]) issues.push(tag + ': 難易度 ' + ev.diff + ' が diffTuning にありません');
+    if (!(ev.courseM >= 200 && ev.courseM <= 270))
+      issues.push(tag + ': コース長 ' + ev.courseM + 'm が ICR 規格（200〜270m）の外です');
+    var cfM = ev.courseM * CONFIG.gateSpacingPctOfCL, dev = Math.abs(gateM - cfM) / cfM;
+    if (dev > 0.15) issues.push(tag + ': ゲート間隔 ' + gateM.toFixed(1) + 'm が CF ' + cfM.toFixed(1) +
+                                'm から ' + (dev * 100).toFixed(1) + '% ずれています（15% 以内）');
+    for (var t = 0; t < ev.tricks.length; t++)
+      if (!CONFIG.airTricks[ev.tricks[t]]) issues.push(tag + ': 技 ' + ev.tricks[t] + ' がありません');
+    if (ev.tricks.indexOf(ev.a1) < 0 || ev.tricks.indexOf(ev.a2) < 0) issues.push(tag + ': 既定の技がこの大会で使えません');
+    if (!CONFIG.airRepeatCounts && ev.a1 === ev.a2) issues.push(tag + ': 既定の技が同じ（2 本目が数えられない）');
+    if (i > 0) {
+      var pv = CONFIG.tour[i - 1].tricks;
+      for (var q = 0; q < pv.length; q++)
+        if (ev.tricks.indexOf(pv[q]) < 0) issues.push(tag + ': 前の大会の技 ' + pv[q] + ' が使えなくなっています');
+    }
+    if (ev.names.length !== ev.field - 1 || ev.scores.length !== ev.field - 1)
+      issues.push(tag + ': 他の選手の数が「出場人数 − 1」と合いません');
+    var seen = {};
+    for (var n = 0; n < ev.names.length; n++) {
+      if (seen[ev.names[n]]) issues.push(tag + ': 名前が重複しています（' + ev.names[n] + '）');
+      seen[ev.names[n]] = 1;
+    }
+    if (!(ev.passRank >= 1 && ev.passRank < ev.field)) issues.push(tag + ': 通過ラインが出場人数の外です');
+    // 理論上の上限＝使える技の最良の組み合わせ。★1 位がこれ以上だと、その大会では絶対に優勝できない（§32.5）
+    var best = 0;
+    for (var x = 0; x < ev.tricks.length; x++) for (var y = 0; y < ev.tricks.length; y++) {
+      CONFIG.selectedAir1 = ev.tricks[x]; CONFIG.selectedAir2 = ev.tricks[y];
+      best = Math.max(best, currentMaxScore().total);
+    }
+    var top = Math.max.apply(null, ev.scores);
+    if (!(top < best)) issues.push(tag + ': 1 位 ' + top.toFixed(2) + ' が理論上の上限 ' + best.toFixed(1) + ' 以上です');
+    lines.push(tag + ' ' + ev.courseM + 'm/' + ev.diff + ' ゲート ' + (dev * 100).toFixed(1) +
+               '% / 1位 ' + top.toFixed(2) + ' < 上限 ' + best.toFixed(1));
+  }
+  CONFIG.selectedAir1 = keep.a1; CONFIG.selectedAir2 = keep.a2;
+  for (var k = 0; k < issues.length; k++) { invariantIssues.push(issues[k]); console.warn('[TOUR WARNING] ' + issues[k]); }
+  if (!issues.length) console.log('[TOUR] 不変条件 OK : ' + lines.join(' / '));
+  window.__tourCheck = { issues: issues, lines: lines };
+})();
+
 applyDifficultyTuning(CONFIG.difficulty);        // ★v6.7 起動時の難易度を反映
 resetGame();
 // 初めて開いた人にはチュートリアルから始める（§19.7）。2 回目からはスタート画面から。
 // 文章の「あそびかた」は自動では出さず、HELP からいつでも読める（§19.5）
-if (tutSeen()) showStartOverlay();
+// ★v8.0 2 回目からはツアー画面から（§32.2）
+if (tutSeen()) showHome();
 else           startTutorial();
 G.lastMs = performance.now();
 requestAnimationFrame(frame);
