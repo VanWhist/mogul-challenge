@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v7.7 -->
+<!-- MOGUL CHALLENGE v7.8 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -96,9 +96,15 @@
   #progBar{position:absolute;top:0;bottom:0;left:0;width:0%;background:#0f8a5f;border-radius:4px;}
 
   /* --- オーバーレイ（スタート／リザルト）--- */
+  /* ★v7.8 縦の中央寄せは justify-content:center ではなく、先頭と末尾の auto マージンで行う。
+     center のままだと、中身が画面より高いときに「上側」へもはみ出し、そこはスクロールしても戻れない
+     （320×568 でリザルトの見出しと TOTAL SCORE の頭、全サイズで HELP の冒頭が切れていた）。
+     auto マージンは中身が収まるときだけ中央に寄せ、あふれるときは 0 になって上から並ぶ */
   .overlay{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;text-align:center;padding:18px 14px;
+    align-items:center;justify-content:flex-start;text-align:center;padding:18px 14px;
     background:rgba(8,20,34,.94);color:#eaf3fb;pointer-events:auto;overflow-y:auto;}
+  .overlay > :first-child{margin-top:auto;}
+  .overlay > :last-child{margin-bottom:auto;}
   .overlay.hidden{display:none;}
   #startOverlay .resRow{width:186px;}
   /* 難易度選択（§7.4 / §19.2） */
@@ -316,16 +322,24 @@
 
   /* --- 画面下部（操作バー＋デバッグ）。縦に積むので重ならない --- */
   #bottom{left:0;right:0;bottom:0;display:flex;flex-direction:column;}
-  #controls{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  /* ★v7.8 RESTART / HOME は中央に置く。端に寄せると、縦の短い画面で左半分だけ 4〜6% がボタンで
+     埋まり、そこを押してもターンにならなかった（右半分は 0%）。中央なら左右で同じだけになる */
+  #controls{display:flex;align-items:center;justify-content:center;gap:6px;position:relative;
     padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));
     background:rgba(255,255,255,.86);border-top:1px solid rgba(13,27,42,.10);
     pointer-events:auto;order:2;}
   /* 狭い画面ではヒントを縮めてボタンを守る（§19.1 はみ出し禁止） */
+  /* ヒントはボタンの中央寄せを崩さないよう左に浮かせる。ボタンと重ならない幅に抑える */
   #hint{font-size:9px;letter-spacing:.06em;color:#5b7186;white-space:nowrap;
-    flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    position:absolute;left:8px;top:50%;transform:translateY(-50%);
+    max-width:calc(50% - 100px);overflow:hidden;text-overflow:ellipsis;}
+  /* 指で遊ぶ端末ではキーボードのヒントは要らない（あそびかたとチュートリアルで伝える） */
+  @media (pointer:coarse){ #hint{display:none;} }
   #btnrow{display:flex;gap:6px;flex:0 0 auto;}
   /* 指で押すボタンは 44px 以上（§19.1）。デバッグ用を隠したぶんの余白をここに回す */
   #btnrow button{min-height:44px;padding:0 14px;}
+  /* ★v7.8 2 つを同じ幅にして、中央の左右で押せない範囲をそろえる */
+  #btnRestart,#btnHome{min-width:78px;}
   button{appearance:none;border:1px solid rgba(13,27,42,.18);background:rgba(255,255,255,.9);
     color:#0d1b2a;font-size:9px;font-weight:700;letter-spacing:.08em;padding:6px 9px;
     border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
@@ -556,7 +570,13 @@
           <div class="sbBar"><i id="sbBarTime"></i></div></div>
       </div>
 
-      <!-- ★v7.7 協賛枠はスコアの直下。ボタンの下だと実機でスクロールしないと見えなかった -->
+      <!-- ★v7.8 並びは「スコア → RETRY / HOME → 協賛枠 → 内訳」。
+           v7.7 で協賛枠をスコアの直下に入れたら RETRY が押し出され、320×568 で 50px・360×640 で 14px
+           はみ出した（§19.1 違反）。ボタンと協賛枠を最初の画面に置き、読み物の内訳はその下に回す -->
+      <div id="resBtnRow">
+        <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
+        <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
+      </div>
       <div class="spBand" id="spResult"></div>
 
       <div class="resSecTitle">TURN の内訳<b id="resTurnSum"></b></div>
@@ -596,10 +616,6 @@
         <div class="resSmall" id="resExtra"></div>
       </div>
 
-      <div id="resBtnRow">
-        <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
-        <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
-      </div>
       <div class="resNote" id="resFormula"></div>
     </div>
   </div>
@@ -627,6 +643,12 @@ var CONFIG = {
   // --- チュートリアル（§19.7）---
   tutSeenKey:       'mogulChallenge.seenTut.v1',   // チュートリアルを終えたかどうか
   tutSlowScale:     0.42,   // 「ゆっくり」段階のスクロール倍率
+  /* ★v7.8 チュートリアルは初級・B級と同じ技で行う（城さん指摘 2026-09-26）。
+     それまでは選んでいた難易度（初めて開いたときは上級）で走り、止めて教える 2 本のあとに急に速くなっていた。
+     AIR 1 は空中のボーナスを教えるため、ボーナスのある技にする（アイアンクロス → コザック） */
+  tutDifficulty:    'beginner',
+  tutAir1:          'ironX',
+  tutAir2:          'spread',
   tutSlowTurns:        3,   // ゆっくりで滑るコブの本数（★上部区間 7 本に収める。2+3+2=7）
   tutNormalTurns:      2,   // 通常速度で滑るコブの本数（同上）
   tutHoldTime:       1.5,   // 成功メッセージを見せる秒数
@@ -709,7 +731,10 @@ var CONFIG = {
   // 「乱れ」= フォールラインからの横揺れ。§14.1 により BALANCE から導出する。
   // 独立した蓄積量は持たない（disturb = 1 − BALANCE/100）
   // ターンの左右振りとは別の、ゆっくりした周期にしてある（同じ周期だと見分けがつかない）
-  lineDriftEnabled: true,
+  /* ★v7.8 切った（城さん指摘 2026-09-26）。モーグルは基本的にフォールラインへまっすぐ滑る。
+     BALANCE が下がると体ごと左右に揺れる演出だったが、BALANCE が下がる＝スピードが落ちている場面で、
+     コブとコブの間で上体が最大 22px 揺れて見えた。乱れは BALANCE バー・MISS の振られ・突き上げで伝わる */
+  lineDriftEnabled: false,
   lineDriftMax:     30,     // 乱れ最大時（BALANCE 0）の横揺れ幅(px)
   lineWanderFreq:   3.4,    // 横揺れの周期(rad/s)。ターン(約12rad/s)より十分ゆっくり
   lineLerp:         5,      // 乱れ量の追従の速さ
@@ -959,8 +984,12 @@ var CONFIG = {
   fieldPitch:            224,   // 同じ行にコブが立つ列の間隔(px)＝横間隔の2倍
   fieldColumns:          2,     // 判定ラインの外側に並べる列数（左右それぞれ）
   fieldHalfWidth:        170,   // コブを置く範囲の半幅。ゲートに重ならないよう境界より内側にする
-  decoScale:             0.88,  // 判定しないコブの大きさ（判定コブに対する比率）
-  decoFade:              0.50,  // 判定しないコブの陰影の弱さ（0〜1）
+  /* ★v7.8 飾りのコブは判定するコブと同じ高さに、反対側の外寄りに 1 つ並ぶ（ダイヤ状の並び）。
+     0.88 / 0.50 では判定するコブと見分けにくく、反対側を押して MAJOR MISS になりやすかった。
+     小さく・薄くして、判定する 2 列だけが浮き上がるようにする（城さん決定 2026-09-26「案 A」） */
+  decoScale:             0.72,  // 判定しないコブの大きさ（判定コブに対する比率）
+  decoFade:              0.30,  // 判定しないコブの陰影の強さ（0〜1。判定するコブは 1）
+  decoAlpha:             0.55,  // 判定しないコブ全体の濃さ（0〜1）
   speckleGap:            26,    // 雪面の粒の間隔(px)。速度感の手がかり
   playerPopTime:         0.22,  // PERFECT 時の選手の拡大演出(秒)
   swayMiss:              20,    // MISS 時に選手が振られる量(px)
@@ -1243,6 +1272,9 @@ var G = null;          // ゲーム状態
 var showWindows = false;
 
 function resetGame(){
+  // ★v7.8 チュートリアル以外で作り直すときは、チュートリアル用の難易度・技を必ず戻す
+  //   （RETRY・RESTART・HOME・スキップのどれで抜けても、元の設定でコースを作る）
+  if (!TUT_STARTING) tutRestoreSettings();
   var course = buildCourse();
   // エアは区間ぶんの配列で持つ（§29）。状態はエアごとに独立
   var airs = [
@@ -2664,7 +2696,7 @@ var elTutBar  = document.getElementById('tutBar');
 var elTutSide = document.getElementById('tutSide');
 var elTutSkip = document.getElementById('tutSkip');
 
-var TUT_ORDER = ['turnStop1', 'turnStop2', 'slow', 'normal', 'airSet', 'airLand', 'free'];
+var TUT_ORDER = ['turnStop1', 'turnStop2', 'slow', 'normal', 'airSet', 'airGrab', 'airLand', 'free'];
 
 /* チュートリアルの表示だけを消す。resetGame から必ず呼ぶ（§19.7）*/
 function tutCleanupUi(){
@@ -2709,8 +2741,29 @@ function tutFirstTarget(){
   return null;
 }
 
+/* ★v7.8 チュートリアルの間だけ、難易度と技をチュートリアル用にする。終わったら必ず戻す */
+var TUT_SAVED = null, TUT_STARTING = false;
+function tutApplySettings(){
+  if (!TUT_SAVED) TUT_SAVED = { diff: CONFIG.difficulty, a1: CONFIG.selectedAir1, a2: CONFIG.selectedAir2 };
+  CONFIG.difficulty = CONFIG.tutDifficulty;
+  applyDifficultyTuning(CONFIG.tutDifficulty);
+  CONFIG.selectedAir1 = CONFIG.tutAir1;
+  CONFIG.selectedAir2 = CONFIG.tutAir2;
+}
+function tutRestoreSettings(){
+  if (!TUT_SAVED) return;
+  CONFIG.difficulty = TUT_SAVED.diff;
+  applyDifficultyTuning(TUT_SAVED.diff);
+  CONFIG.selectedAir1 = TUT_SAVED.a1;
+  CONFIG.selectedAir2 = TUT_SAVED.a2;
+  TUT_SAVED = null;
+}
+
 function startTutorial(){
+  tutApplySettings();
+  TUT_STARTING = true;
   resetGame();
+  TUT_STARTING = false;
   hideOverlays();
   G.phase = 'running';
   G.tut = { i: -1, wait: false, hold: 0, scale: 1, target: null, air: null, base: 0 };
@@ -2752,10 +2805,16 @@ function tutEnter(i){
     if (G.playerD < jump) tutJumpTo(jump);
     tutShow('エア ①セット', 'エア台が来ます。<em>緑の SET ライン</em>で構えを作ります。',
             '線がちょうど自分に重なったところです。台の根元と同じ位置です。', '', null);
+  } else if (name === 'airGrab') {
+    // ★v7.8 空中のボーナス（グラブ・技の発展・形を保つ）を教える。ボーナスのない技なら飛ばす
+    if (!airBonusOf(a.trick)) { tutEnter(i + 1); return; }
+    T.scale = 0.5;
+    T.air = a;
+    tutShow('エア ②空中', '踏み切ったら、<em>空中でもう一度タップ</em>できます。', '', '', null);
   } else if (name === 'airLand') {
     T.scale = 0.5;
     T.air = a;
-    tutShow('エア ②着地', '空中です。<em>着地の瞬間</em>にもう一度タップします。', '', '', null);
+    tutShow('エア ③着地', '空中です。<em>着地の瞬間</em>にもう一度タップします。', '', '', null);
   } else if (name === 'free') {
     // 教えるのはここまで。あとは止めずにゴールまで滑ってもらう（§19.7）
     T.scale = 1;
@@ -2834,12 +2893,23 @@ function tutPostMove(dt){
               'リップまであと ' + CONFIG.airSetIdealM + ' m。左右どちらをタップしても同じです。',
               'タップしてください', 'both');
     }
+  } else if (name === 'airGrab') {
+    var g = T.air;
+    // 空中のボーナスを受け付ける範囲のまん中で止める
+    var gu = (CONFIG.grabFromU + CONFIG.grabToU) / 2;
+    if (g && g.stage === 'flight' && !g.bonusOn && g.u >= gu) {
+      G.playerD = g.dLip + gu * (g.dLand - g.dLip);
+      T.wait = true;
+      tutShow('エア ②空中', 'いまタップ。<em>' + tutBonusWhat(g.trick) + '</em>',
+              '押すのは飛んだ直後から頂点のあたりまで。押さなくても着地はできます。',
+              'タップしてください', 'both');
+    }
   } else if (name === 'airLand') {
     var b = T.air;
     if (b && b.stage === 'flight' && b.result === null && G.playerD >= b.dLand) {
       G.playerD = b.dLand;                          // ★理想の着地点ちょうどで止める
       T.wait = true;
-      tutShow('エア ②着地', 'いまタップ。<em>ここが着地の瞬間</em>。',
+      tutShow('エア ③着地', 'いまタップ。<em>ここが着地の瞬間</em>。',
               '早すぎると後傾、遅すぎると前傾になります。',
               'タップしてください', 'both');
     }
@@ -2882,15 +2952,40 @@ function tutInput(dir, tMs){
     return true;
   }
 
+  if (name === 'airGrab') {
+    var ok = resolveAirGrab(T.air);         // ★本物の処理。窓のまん中で止めてあるので必ず成立する
+    T.wait = false; tutHideSide();
+    tutShow('エア ②空中', ok ? '<em>' + airBonusDone(airBonusOf(T.air.trick)) + '</em>　空中のボーナスです。' : 'ボーナスは成立しませんでした。',
+            tutBonusEffect(T.air.trick), '', null);
+    T.hold = CONFIG.tutHoldTime;
+    return true;
+  }
+
   if (name === 'airLand') {
     resolveAirLanding(T.air, tMs);          // ★本物の判定。位置を合わせてあるので perfect
     T.wait = false; tutHideSide();
-    tutShow('エア ②着地', 'PERFECT。<em>これで 1 本のエア</em>です。',
-            'セットと着地の 2 回。踏み切る操作はありません。', '', null);
+    tutShow('エア ③着地', 'PERFECT。<em>これで 1 本のエア</em>です。',
+            'セット・空中・着地の 3 回。空中のタップはしなくてもよく、踏み切る操作はありません。', '', null);
     T.hold = CONFIG.tutHoldTime;
     return true;
   }
   return true;
+}
+
+/* ★v7.8 空中のボーナスの説明。技ごとに中身が違う（§17.7） */
+function tutBonusWhat(trick){
+  var b = airBonusOf(trick), t = (CONFIG.airTricks[trick] || {}).label || trick;
+  if (!b) return '';
+  if (b.type === 'grab')   return '板をつかみます（' + b.label + ' GRAB）。';
+  if (b.type === 'double') return b.label + ' に発展します。';     // 1 行に収める（320px）
+  return t + ' の形を保ちます。';
+}
+function tutBonusEffect(trick){
+  var b = airBonusOf(trick);
+  if (!b) return '';
+  if (b.type === 'grab')   return '技の難しさ（DD）が上がり、エアの点が伸びます。';
+  if (b.type === 'double') return '2 つの技を続けるダブルになり、技の難しさ（DD）が上がります。';
+  return '技の完成度（評価点）が上がります。';
 }
 
 /* 教える役目を終えてチュートリアルを解く。ランはそのまま続く（§19.7）。
@@ -3754,7 +3849,10 @@ function drawMogul(m, cx, judgeY){
     if (k === 0) continue;
     var wx = m.side * CONFIG.mogulOffsetX + k * CONFIG.fieldPitch;
     if (Math.abs(wx) > CONFIG.fieldHalfWidth) continue;
+    ctx.save();
+    ctx.globalAlpha = CONFIG.decoAlpha;
     drawBumpShape(cx + wx * sc, y, sc, CONFIG.decoScale, CONFIG.decoFade);
+    ctx.restore();
   }
 
   drawBumpShape(x, y, sc, 1, 1);
