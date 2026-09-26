@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.0 -->
+<!-- MOGUL CHALLENGE v8.1 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -165,6 +165,8 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25;}
   .tstep .tn{font-size:10.5px;font-weight:800;letter-spacing:.02em;}
   .tstep .ts{font-size:8px;font-weight:900;letter-spacing:.14em;margin-top:2px;color:#5f88ab;min-height:10px;}
+  /* ★v8.1 挑戦回数（§32.10）。字数が増えるので字間を詰め、1 行に収める */
+  .tstep .ts.cnt{letter-spacing:0;white-space:nowrap;}
   .tstep.clear .ts{color:#2fb98a;}
   .tstep.on{background:#2f9bff;border-color:#2f9bff;color:#fff;}
   .tstep.on .ts{color:#dbeeff;}
@@ -2428,7 +2430,8 @@ function tourIdx(key){
 function tourEv(key){ var i = tourIdx(key); return i >= 0 ? CONFIG.tour[i] : null; }
 
 function tourLoad(){
-  var db = { v: 1, cleared: [], best: {}, champion: false };
+  // ★v8.1 tries＝完走した回数、clearTry＝初めて通過したのが何回目か（§32.10）。v:1 のまま足す（v8.0 の記録もそのまま読める）
+  var db = { v: 1, cleared: [], best: {}, champion: false, tries: {}, clearTry: {} };
   if (!recordsAvailable) return db;
   try {
     var raw = window.localStorage.getItem(CONFIG.tourStoreKey);
@@ -2438,6 +2441,8 @@ function tourLoad(){
         if (o.cleared instanceof Array) db.cleared = o.cleared;
         if (o.best && typeof o.best === 'object') db.best = o.best;
         db.champion = !!o.champion;
+        if (o.tries && typeof o.tries === 'object') db.tries = o.tries;
+        if (o.clearTry && typeof o.clearTry === 'object') db.clearTry = o.clearTry;
       }
     }
   } catch (e) { /* 壊れていたら既定値で続ける。消さない */ }
@@ -2539,10 +2544,15 @@ function renderTour(db){
   var h = '';
   for (var i = 0; i < CONFIG.tour.length; i++) {
     var e = CONFIG.tour[i], un = tourUnlocked(i, db), cl = db.cleared.indexOf(e.key) >= 0;
+    // ★v8.1 2 行目に挑戦回数（§32.10）。v8.0 のうちに通過した大会は何回目か分からないので CLEAR のまま
+    var nT = db.tries[e.key], nC = db.clearTry[e.key], ts = '', cnt = false;
+    if (cl) { if (typeof nC === 'number') { ts = nC + '回目で通過'; cnt = true; } else ts = 'CLEAR'; }
+    else if (!un) ts = 'LOCK';
+    else if (typeof nT === 'number' && nT > 0) { ts = '挑戦 ' + nT + '回'; cnt = true; }
     h += '<button class="tstep' + (e.key === TOUR.key ? ' on' : '') + (un ? '' : ' lock') +
          (cl ? ' clear' : '') + '" type="button" data-tour="' + e.key + '"' + (un ? '' : ' disabled') + '>' +
          '<span class="tn">' + e.step[0] + '<br>' + e.step[1] + '</span>' +
-         '<span class="ts">' + (cl ? 'CLEAR' : (un ? '' : 'LOCK')) + '</span></button>';
+         '<span class="ts' + (cnt ? ' cnt' : '') + '">' + ts + '</span></button>';
   }
   document.getElementById('tourSteps').innerHTML = h;
   document.getElementById('tourChamp').textContent = db.champion ? '★ ツアー制覇 ★' : '';
@@ -2551,9 +2561,14 @@ function renderTour(db){
   document.getElementById('tourNote').textContent = ev.note;
   document.getElementById('tourMeta').textContent =
     ev.courseM + ' m ・ 出場 ' + ev.field + ' 人 ・ ' + ev.passRank + ' 位以内で通過';
-  var best = db.best[ev.key];
-  document.getElementById('tourBest').textContent = !recordsAvailable ? 'この端末では記録を保存できません'
-    : (typeof best === 'number' ? '自己ベスト ' + best.toFixed(2) : 'はじめての出場');
+  var best = db.best[ev.key], nTry = db.tries[ev.key], nClr = db.clearTry[ev.key];
+  // ★v8.1 自己ベストの行に挑戦回数と「何回目で通過」を足す（§32.10）。行は増やさない
+  var bl = typeof best === 'number' ? '自己ベスト ' + best.toFixed(2) : 'はじめての出場';
+  if (typeof nTry === 'number' && nTry > 0) {
+    bl += ' ・ 挑戦 ' + nTry + ' 回';
+    if (typeof nClr === 'number') bl += '（' + nClr + ' 回目で通過）';
+  }
+  document.getElementById('tourBest').textContent = !recordsAvailable ? 'この端末では記録を保存できません' : bl;
 
   // 使える技だけ出す。この大会で新しく使えるようになった技に NEW を付ける（§32.2）
   var sel = { '1': CONFIG.selectedAir1, '2': CONFIG.selectedAir2 };
@@ -2619,18 +2634,21 @@ function tourPush(s){
   var lineScore = st.rows[ev.passRank - 1].score;
   var need = passed ? 0 : Math.max(0.01, +(lineScore - total).toFixed(2));
   var db = tourLoad();
+  // ★v8.1 完走した回数を数える。ここに来るのは完走したランだけ（HOME・RESTART・チュートリアルからの続きは finishRun の前で外れる）
+  var tries = (typeof db.tries[ev.key] === 'number' ? db.tries[ev.key] : 0) + 1;
+  db.tries[ev.key] = tries;
   var prevBest = typeof db.best[ev.key] === 'number' ? db.best[ev.key] : null;
   var isPb = prevBest === null || total > prevBest;
   if (isPb) db.best[ev.key] = total;
   var newClear = passed && db.cleared.indexOf(ev.key) < 0;
-  if (newClear) db.cleared.push(ev.key);
+  if (newClear) { db.cleared.push(ev.key); db.clearTry[ev.key] = tries; }   // ★v8.1 何回目で通過したか
   var last = idx === CONFIG.tour.length - 1;
   var champNow = passed && last && !db.champion;
   if (passed && last) db.champion = true;
   var saved = tourSave(db);
   return { tour: true, key: ev.key, total: total, rank: st.rank, rows: st.rows,
            field: ev.field, passRank: ev.passRank, passed: passed, need: need, lineScore: lineScore,
-           prevBest: prevBest, isPb: isPb, saved: saved, newClear: newClear,
+           prevBest: prevBest, isPb: isPb, saved: saved, newClear: newClear, tries: tries,
            champion: passed && last, champNow: champNow,
            next: (passed && !last) ? CONFIG.tour[idx + 1].key : null };
 }
