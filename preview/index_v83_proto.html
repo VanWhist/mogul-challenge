@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.3 試作2（前から見る視点・未反映。v8.2 がもと） -->
+<!-- MOGUL CHALLENGE v8.3 試作3（前から見る視点・未反映。v8.2 がもと） -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -5064,30 +5064,36 @@ var FV = {
   bumpSx: 1.0, bumpSz: 1.2
 };
 var FV_VIEWS = ['normal', 'frontA', 'frontB'];
-var FV_LABEL = { normal: 'いつもの', frontA: '前・追う', frontB: '前・固定' };
+var FV_LABEL = { normal: 'いつもの', frontA: 'テレビ', frontB: 'ジャッジ' };   // 案A＝テレビ中継、案B＝ジャッジ目線（城さん 2026-09-27）
 
-/* コブの置き方（前からの視点だけ）
-   ・上から見る画面ではコブの横を回るが、前から見ると吸収はコブの肩に乗って畳む動きになる。
-     そこで、そのランで足が通った位置（記録から読む）にコブの肩が来るよう、コブの列を横にずらして置く
-   ・コブの頂上は、吸収が最も深くなる位置（上から見るコブの判定位置の 0.7 m 先）に置く。
-     コブの山側の面は短く、谷側は長い（吸収の「素早く畳む → ゆっくり伸ばす」に合わせた形）
-     → PERFECT の吸収なら頭の高さがそろい、タイミングがずれると頭が上下する
-   ・列の中のコブの横の間隔は 3.4 m */
-var FV_PEAK_LAG = 0.7, FV_PITCH = 3.4, FV_SU = 0.5, FV_SD = 1.2;
+/* コブの置き方とターン（前からの視点だけ。城さん 2026-09-27：3 レーン分・右と左のコブでターンが合うように）
+   ・ターンごとに「足が右にあるときは右のコブ、左にあるときは左のコブ」に乗って吸収する形にする
+   ・ターンの頂点（足がいちばん横に出るところ）＝吸収がいちばん深いところ（判定位置の 0.7 m 先）＝コブの内側の肩
+     上から見る画面の足の横の動きは吸収より少し先に動くので、前からの視点では足の横の位置だけ
+     ターンの頂点に合わせて描き直す（描くだけ。判定・採点・記録には触れない）
+   ・コブは 4 列（±1.1 m と ±3.3 m）を互い違いに置く → 選手のレーンと左右 1 レーンずつの 3 レーン。外は平らな雪
+   ・コブの山側の面は短く、谷側は長い（吸収の「素早く畳む → ゆっくり伸ばす」に合わせた形）
+     → PERFECT の吸収なら頭の高さがそろい、タイミングがずれると頭が上下する */
+var FV_PEAK_LAG = 0.7, FV_COL = 1.1, FV_SU = 0.5, FV_SD = 1.2, FV_BUMP_H = 0.5, FV_SWING = 0.55;
 function fvPrepare(){
-  var ppm = FV.ppm, b = [], fr = REPLAY.frames, fi = 0;
+  var ppm = FV.ppm, b = [], fr = REPLAY.frames, fi = 0, turns = [];
   for (var i = 0; i < G.moguls.length; i++) {
-    var m = G.moguls[i], z = m.d / ppm + FV_PEAK_LAG, off = m.side * 1.0;
-    while (fi + 1 < fr.length && fr[fi].g.playerD < z * ppm) fi++;
-    if (fr[fi] && fr[fi].g.playerD >= z * ppm - 5) { var p = fr[fi].p; off = (p.line + p.x + p.sway) / ppm; }
-    for (var k = -3; k <= 3; k++) {
-      var x = off + k * FV_PITCH;
-      if (Math.abs(x) > FV.courseHalf - 0.4) continue;
-      b.push({ x: x, z: z, h: 0.6, main: k === 0, i: i });
+    var m = G.moguls[i], z = m.d / ppm + FV_PEAK_LAG, e = -m.side;
+    while (fi + 1 < fr.length && fr[fi].g.playerD < m.d) fi++;
+    if (fr[fi] && Math.abs(fr[fi].g.playerD - m.d) < 20) {
+      var p = fr[fi].p, fx = (p.line + p.x + p.sway) / ppm;
+      if (Math.abs(fx) > 0.15) e = fx > 0 ? 1 : -1;       // そのランで足が実際にあった側
+    }
+    turns.push({ z: z, e: e });
+    for (var k = -1; k <= 1; k++) {
+      var x = e * FV_COL + k * 4 * FV_COL;
+      if (Math.abs(x) > 3 * FV_COL + 0.01) continue;
+      b.push({ x: x, z: z, h: FV_BUMP_H, main: k === 0, i: i });
     }
   }
   b.sort(function(p, q){ return p.z - q.z; });
-  FV.bumps = b;
+  turns.sort(function(p, q){ return p.z - q.z; });
+  FV.bumps = b; FV.turns = turns;
   var t = [], zEnd = G.finishD / ppm + 40;
   for (var z2 = -40, n = 0; z2 < zEnd; z2 += 7, n++) {
     for (var s = -1; s <= 1; s += 2) {
@@ -5100,6 +5106,16 @@ function fvPrepare(){
 }
 // 斜面の高さ。ゴールから先は緩い平らな場所（6°）にする（案B のカメラがゴールの先に立つため）
 var FV_TAN_OUT = Math.tan(6 * Math.PI / 180);
+/* 前からの視点の足の横の位置：ターンの頂点（FV.turns）の間を cos でつなぐ。頂点が 4.5 m 以上離れている区間（エアなど）は null */
+function fvFootX(z){
+  var t = FV.turns; if (!t || !t.length) return null;
+  var lo = 0, hi = t.length - 1;
+  if (z < t[0].z || z > t[hi].z) return null;
+  while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (t[mid].z <= z) lo = mid; else hi = mid; }
+  var a = t[lo], c = t[hi]; if (c.z - a.z > 4.5) return null;
+  var u = (z - a.z) / Math.max(0.01, c.z - a.z), w = (1 - Math.cos(Math.PI * u)) / 2;
+  return FV_SWING * (a.e + (c.e - a.e) * w);
+}
 function fvBase(z){
   var zf = G.finishD / FV.ppm;
   return z <= zf ? -z * FV.tan : -zf * FV.tan - (z - zf) * FV_TAN_OUT;
@@ -5154,6 +5170,12 @@ function fvP(cam, xg, y, z){
 function fvSkier(){
   var ppm = FV.ppm, p = G.player, zs = G.playerD / ppm;
   var swing = p.x + p.sway;
+  var fx = fvFootX(zs), heading = null;
+  if (fx !== null && G.fallAnim <= 0.02) {
+    swing = fx * ppm;                                   // 前からの視点：足の横の位置をターンの頂点に合わせる
+    var dxz = (fvFootX(zs + 0.2) !== null ? fvFootX(zs + 0.2) : fx) - (fvFootX(zs - 0.2) !== null ? fvFootX(zs - 0.2) : fx);
+    heading = clamp(Math.atan(dxz / 0.4) * 0.7, -0.35, 0.35);   // 板は足の進む向きへ
+  }
   var footX = (p.line + swing) / ppm;
   var hipX  = (p.line + swing * (CONFIG.upperBodyFixed ? CONFIG.hipFollow   : 1)) / ppm;
   var torX  = (p.line + swing * (CONFIG.upperBodyFixed ? CONFIG.torsoFollow : 1)) / ppm;
@@ -5180,7 +5202,7 @@ function fvSkier(){
   if (airH > 0.05) { var gb = fvBase(zs); gL = gR = gb + airH; fL.y = gL + 0.12 * sp; fR.y = gR + 0.12 * sp; }
   else { fL.y = gL; fR.y = gR; }
   // 脚の長さ：伸びて 0.90 m、吸収で最大 0.48 m 縮む。MISS の突き上げで腰が上へ押される
-  var L = 0.90 - 0.48 * Math.max(c, -0.35) - tk + 0.10 * buck;
+  var L = 0.90 - 0.34 * Math.max(c, -0.35) - tk + 0.10 * buck;   // 吸収で最大 0.29 m 縮む（見本の動画の膝の曲がり方に合わせて浅くした）
   if (airH > 0.05) L = 0.90 - 0.08 * sp;
   var feetY = Math.max(fL.y, fR.y);
   var hip = { xg: hipX, y: feetY + L, z: zs - 0.06 - 0.10 * Math.max(c, 0) };
@@ -5225,7 +5247,8 @@ function fvSkier(){
   }
   // 板：ターンでは脚の振れる向きへ板先を向ける。スプレッドでは V に開く
   var skis = [];
-  var heads = [lean * 0.28 - 0.30 * sp, lean * 0.28 + 0.30 * sp];   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
+  var hd0 = heading !== null ? heading : lean * 0.28;
+  var heads = [hd0 - 0.30 * sp, hd0 + 0.30 * sp];   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
   [fL, fR].forEach(function(f, idx){
     var a = heads[idx], sx = Math.sin(a), cz = Math.cos(a);
     var tipZ = f.z + cz * 0.88, tailZ = f.z - cz * 0.80, tipX = f.xg + sx * 0.88, tailX = f.xg - sx * 0.80;
@@ -5252,19 +5275,22 @@ function fvSkier(){
 /* ---- カメラの 2 案 ----
    どちらも縦の向きは「斜面＋一定の高さ」を狙い、選手の腰そのものは追わない。
    腰を追うと画面の中で選手が止まり、吸収が合っているか（頭が上下しないか）が見えなくなるため */
-var FV_HEAD = 1.80;   // 吸収がそろっているときの頭の高さ（斜面から。PERFECT が続くオートプレイで 1.77〜1.84 に収まる）
+var FV_HEAD = 1.73;   // 吸収がそろっているときの頭の高さ（斜面から。PERFECT が続くオートプレイの平均）
 function fvMakeCam(mode, st){
-  var H = view.H, aim = fvBase(st.zs) + 0.95 + st.airH;
+  var H = view.H, aim = fvBase(st.zs) + 0.95 + st.airH, zF = G.finishD / FV.ppm;
   if (mode === 'frontB') {
-    // 案B：ゴールの 14 m 先、ゴールとほぼ同じ高さに固定。向きだけ選手を追う（ズームしない）。城さん OK の見え方（2026-09-27）
-    var zF = G.finishD / FV.ppm + 14;
-    return fvCamera({ xg: -4.5, y: -zF * FV.tan + 6.0, z: zF }, { xg: st.hip.xg, y: aim, z: st.zs }, H * 2.6);
+    // 案B：ジャッジ目線。ゴールの 12 m 先、コースの少し左、ジャッジ席の高さ（下の雪から 6 m）に固定。
+    //   向きだけ選手を追う（ズームしない）【叩き台】
+    var zJ = zF + 12;
+    return fvCamera({ xg: 3.0, y: fvBase(zJ) + 6.0, z: zJ }, { xg: st.hip.xg, y: aim, z: st.zs }, H * 2.6);
   }
-  // 案A：案B と同じ見え方のまま、選手の 20 m 下（前）について下りる。コブの列がコース幅いっぱいに見える（城さん 2026-09-27）
-  var D = 20;
-  var cam = fvCamera({ xg: st.hip.xg * 0.3 - 1.5, y: fvBase(st.zs) - D * FV.tan + 6.0 + st.airH * 0.5, z: st.zs + D },
-                     { xg: st.hip.xg * 0.6, y: aim, z: st.zs }, H * 2.6);
-  cam.cy = H * 0.54;
+  // 案A：テレビ中継。ゴールの 25 m 先、下の雪から 2.5 m の低い位置に固定し、ズームで選手の大きさを
+  //   ほぼ一定（画面の高さの 2 割）に保って追う。見本の動画（MAH00536）に合わせた望遠の見え方【叩き台】
+  var zT = zF + 25, C = { xg: -2.0, y: fvBase(zT) + 2.5, z: zT };
+  var dx = -st.hip.xg - (-C.xg), dy = aim - C.y, dz = st.zs - C.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  var F = clamp(0.20 * H * dist / 1.8, H * 1.2, H * 60);
+  var cam = fvCamera(C, { xg: st.hip.xg * 0.8, y: aim, z: st.zs }, F);
+  cam.cy = H * 0.52;
   return cam;
 }
 /* ---- 雪面（高さの網を奥から手前へ塗る。陰影でコブの列を見せる） ---- */
@@ -5309,9 +5335,12 @@ function fvStrips(cam, zFar, zNear){
   while (i > iFar) {
     // 画面の上で 1 本の帯が 5px 以上になるまで行を間引く（見た目が変わらない範囲で塗る数を減らす）
     var y0 = yAt(i), step = 1;
+    if (y0 !== null && y0 < -60) break;                                   // ここから奥は画面の上の外
+    if (y0 !== null && y0 > view.H + 60) { i -= 1; continue; }            // 画面の下の外（まだ手前）
     while (step < 32 && i - step * 2 > iFar) { var y1 = yAt(i - step * 2); if (y0 === null || y1 === null || Math.abs(y0 - y1) >= 5) break; step *= 2; }
     var i2 = Math.max(iFar, i - step);
-    var dist = Math.max(1, cam.z - (g.z0 + i * FV_GDZ)), cs = dist < 12 ? 1 : 2;
+    var dist = Math.max(1, cam.z - (g.z0 + i * FV_GDZ)), px = cam.F * FV_GDX / dist;   // 網 1 目の横幅（画面の px）
+    var cs = px > 5 ? 1 : px > 2.5 ? 2 : 4;
     out.push({ near: fvRowData(cam, i, cs, cache), far: fvRowData(cam, i2, cs, cache) });
     i = i2;
   }
@@ -5403,7 +5432,8 @@ function fvDrawFinish(cam, st){
 
 /* ---- 選手 ---- */
 function fvDrawSkier(cam, st){
-  var NAVY = '#1c2940', KNEE = '#f2c230', JACKET = '#d8412f', SKI = '#2b7bd9';
+  // ウェア：上は赤、パンツは白、膝当ては赤（城さん 2026-09-27、見本の動画に合わせる）。白いパンツは雪に溶けるので細い縁を付ける
+  var PANTS = '#f6f7f9', PANTS_EDGE = '#7d8a9b', KNEE = '#d23a2c', JACKET = '#d8412f', SKI = '#2b7bd9';
   // 影（空中では小さく薄く。高さの手がかり）
   var sh = fvP(cam, st.shadowX, st.groundY + 0.02, st.zs);
   if (sh) {
@@ -5416,9 +5446,13 @@ function fvDrawSkier(cam, st){
   st.skis.forEach(function(s){ fvLine(cam, s.tail, s.tip, 0.10, SKI); fvDot(cam, s.tip, 0.055, '#e9f1fb'); });
   // 脚：すね → もも。膝に色（モーグルのウェアと同じ。ジャッジが見る膝の曲げ伸ばしを読みやすくする）
   [[st.hpL, st.knL, st.fL], [st.hpR, st.knR, st.fR]].forEach(function(l){
-    fvLine(cam, l[2], l[1], 0.15, NAVY);
-    fvLine(cam, l[1], l[0], 0.18, NAVY);
-    fvDot(cam, l[1], 0.11, KNEE);
+    fvLine(cam, l[2], l[1], 0.21, PANTS_EDGE);
+    fvLine(cam, l[1], l[0], 0.24, PANTS_EDGE);
+    fvLine(cam, l[2], l[1], 0.17, PANTS);
+    fvLine(cam, l[1], l[0], 0.20, PANTS);
+    // 膝当て：膝からすねの上半分を赤く（見本の動画のウェア）
+    var kp = { xg: l[1].xg + (l[2].xg - l[1].xg) * 0.45, y: l[1].y + (l[2].y - l[1].y) * 0.45, z: l[1].z + (l[2].z - l[1].z) * 0.45 };
+    fvLine(cam, l[1], kp, 0.17, KNEE); fvDot(cam, l[1], 0.095, KNEE);
     fvDot(cam, l[2], 0.075, '#111820');
   });
   // 上体：腰と肩の 4 点
