@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.3 試作3（前から見る視点・未反映。v8.2 がもと） -->
+<!-- MOGUL CHALLENGE v8.3 試作4（前から見る視点・未反映。v8.2 がもと） -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -4906,7 +4906,7 @@ if (window.ResizeObserver) {
 function frame(now){
   // ★v8.2 リプレイ中は update（判定・採点・動き）を一度も呼ばない。記録を描くだけ（§32.11）
   // ★v8.3 試作 前から見る視点はリプレイの中だけ（描くだけ。update は呼ばない）
-  if (REPLAY.active) { replayStep(now); if (REPLAY.view === 'normal') render(); else renderFront(); }
+  if (REPLAY.active) { replayStep(now); if (REPLAY.view === 'normal') render(); else { fvLerp(now); renderFront(); } }
   else { update(now); render(); replayRecord(); }
   requestAnimationFrame(frame);
 }
@@ -5078,12 +5078,8 @@ var FV_PEAK_LAG = 0.7, FV_COL = 1.1, FV_SU = 0.5, FV_SD = 1.2, FV_BUMP_H = 0.5, 
 function fvPrepare(){
   var ppm = FV.ppm, b = [], fr = REPLAY.frames, fi = 0, turns = [];
   for (var i = 0; i < G.moguls.length; i++) {
-    var m = G.moguls[i], z = m.d / ppm + FV_PEAK_LAG, e = -m.side;
-    while (fi + 1 < fr.length && fr[fi].g.playerD < m.d) fi++;
-    if (fr[fi] && Math.abs(fr[fi].g.playerD - m.d) < 20) {
-      var p = fr[fi].p, fx = (p.line + p.x + p.sway) / ppm;
-      if (Math.abs(fx) > 0.15) e = fx > 0 ? 1 : -1;       // そのランで足が実際にあった側
-    }
+    // コブの左右は上から見る画面と同じ（m.side）。右のコブで右へ、左のコブで左へ足を出して吸収する（試作4）
+    var m = G.moguls[i], z = m.d / ppm + FV_PEAK_LAG, e = m.side >= 0 ? 1 : -1;
     turns.push({ z: z, e: e });
     for (var k = -1; k <= 1; k++) {
       var x = e * FV_COL + k * 4 * FV_COL;
@@ -5182,6 +5178,7 @@ function fvSkier(){
   var c = CONFIG.absorbEnabled ? clamp(p.comp * p.compQ, -0.45, 1.15) : 0;
   var buck = clamp(p.buck, 0, 1.5);
   var air = activeAir(G.playerD), airH = 0, sp = 0, other = null, tk = 0;
+  var ix = 0, kz = 0, bs = 0, safety = 0;   // ★段階2 ① アイアンクロス・コザック・バックスクラッチャー（SAFETY）の形の量 0〜1
   if (air) {
     if (air.stage === 'takeoff' && !(air.setResult && air.setResult !== 'none')) {
       tk = Math.min(1, clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1) / 0.5) * 0.45;
@@ -5190,25 +5187,42 @@ function fvSkier(){
       var u = clamp(air.u, 0, 1);
       airH = 0.65 * (1 - u) + 2.9 * Math.sin(Math.PI * u);
       var e = clamp(air.poseE, 0, 1), peak = Math.sin(Math.PI * e), open = clamp(air.openT, 0, 1);
-      if (air.trick === 'spread') sp = Math.pow(peak, 1.2) * (1 - open);
+      var pk = Math.pow(peak, 1.2) * (1 - open);
+      if (air.trick === 'spread') sp = pk;
+      else if (air.trick === 'ironX') {
+        // アイアンクロス：膝を曲げて板を体の前で × に交差。空中のタップでコザック（脚を左右に大きく開き、手をつま先へ）
+        kz = (air.bonusOn && air.bonusPose === 'kosak') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
+        ix = pk * (1 - kz);
+      }
+      else if (air.trick === 'backScr') {
+        // バックスクラッチャー：膝を前へ曲げ、板のテールを背中側へ跳ね上げる。SAFETY は手で板をつかむ
+        bs = pk;
+        safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
+      }
       else other = air.trick;
     }
   }
   if (airH > 0.05) { var rg = clamp(airH / 0.6, 0, 1); footX += (torX - footX) * rg; hipX += (torX - hipX) * rg; }
   var lean = clamp(p.lean, -1, 1);
-  var feetSep = 0.13 + 0.5 * sp;
-  var fL = { xg: footX - feetSep, z: zs }, fR = { xg: footX + feetSep, z: zs };
+  // 足の幅：見本の動画のように両脚をそろえる（試作4）。MISS の突き上げでは少し開く
+  var feetSep = 0.09 + 0.5 * sp + 0.12 * ix + 0.78 * kz + 0.10 * clamp(buck, 0, 1);
+  var fz = zs + 0.22 * ix - 0.55 * bs;                 // アイアンクロスは足を前へ、バックスクラッチャーは後ろへ
+  var fL = { xg: footX - feetSep, z: fz }, fR = { xg: footX + feetSep, z: fz };
   var gL = fvGround(fL.xg, zs), gR = fvGround(fR.xg, zs);
-  if (airH > 0.05) { var gb = fvBase(zs); gL = gR = gb + airH; fL.y = gL + 0.12 * sp; fR.y = gR + 0.12 * sp; }
+  if (airH > 0.05) {
+    var gb = fvBase(zs); gL = gR = gb + airH;
+    var lift = 0.12 * sp + 0.22 * ix + 0.50 * kz + 0.62 * bs;
+    fL.y = gL + lift; fR.y = gR + lift;
+  }
   else { fL.y = gL; fR.y = gR; }
   // 脚の長さ：伸びて 0.90 m、吸収で最大 0.48 m 縮む。MISS の突き上げで腰が上へ押される
   var L = 0.90 - 0.34 * Math.max(c, -0.35) - tk + 0.10 * buck;   // 吸収で最大 0.29 m 縮む（見本の動画の膝の曲がり方に合わせて浅くした）
-  if (airH > 0.05) L = 0.90 - 0.08 * sp;
+  if (airH > 0.05) L = 0.90 - 0.08 * sp - 0.28 * ix - 0.50 * bs - 0.45 * kz;
   var feetY = Math.max(fL.y, fR.y);
   var hip = { xg: hipX, y: feetY + L, z: zs - 0.06 - 0.10 * Math.max(c, 0) };
   // 上体：前へ少し倒す。吸収で少し深く、MISS で後ろへのけぞる
   var pitch = 0.20 + 0.22 * Math.max(c, 0) - 0.55 * buck;
-  if (airH > 0.05) pitch = 0.08;
+  if (airH > 0.05) pitch = 0.08 + 0.25 * kz + 0.10 * ix;
   var roll = -lean * 0.05;
   var tl = 0.52;
   var sho = { xg: torX, y: hip.y + tl * Math.cos(pitch), z: hip.z + tl * Math.sin(pitch) };
@@ -5227,15 +5241,25 @@ function fvSkier(){
   // 腕とストック
   var hands, elbows, poles = [];
   if (airH > 0.05) {
-    var up = sp;
+    var up = Math.max(sp, 0.55 * ix, 0.45 * bs);
     hands = [ { xg: shL.xg - 0.28 - 0.45 * up, y: sho.y - 0.30 + 0.62 * up, z: sho.z + 0.22 * (1 - up) },
               { xg: shR.xg + 0.28 + 0.45 * up, y: sho.y - 0.30 + 0.62 * up, z: sho.z + 0.22 * (1 - up) } ];
   } else {
-    hands = [ { xg: shL.xg - 0.10, y: sho.y - 0.38, z: sho.z + 0.40 }, { xg: shR.xg + 0.10, y: sho.y - 0.38, z: sho.z + 0.40 } ];
+    // 手は腰の高さで体の前（見本の動画）。MISS の突き上げでは腕が上へ跳ねる
+    var fl = clamp(buck, 0, 1);
+    hands = [ { xg: shL.xg - 0.12 - 0.25 * fl, y: sho.y - 0.40 + 0.50 * fl, z: sho.z + 0.42 - 0.25 * fl },
+              { xg: shR.xg + 0.12 + 0.25 * fl, y: sho.y - 0.40 + 0.50 * fl, z: sho.z + 0.42 - 0.25 * fl } ];
   }
   var plant = (p.poleT > 0 && airH <= 0.05) ? clamp(p.poleT / 0.18, 0, 1) : 0;
   var pside = p.poleSide >= 0 ? 1 : 0;
   if (plant > 0) { var hh = hands[pside]; hh.y -= 0.10 * plant; hh.z += 0.18 * plant; hh.xg += (pside ? 0.06 : -0.06) * plant; }
+  if (kz > 0) {   // コザック：両手をつま先の方へ
+    hands[0] = { xg: hands[0].xg + (fLa.xg - 0.1 - hands[0].xg) * 0.7 * kz, y: hands[0].y + (fLa.y + 0.15 - hands[0].y) * 0.7 * kz, z: hands[0].z + (fLa.z + 0.2 - hands[0].z) * 0.7 * kz };
+    hands[1] = { xg: hands[1].xg + (fRa.xg + 0.1 - hands[1].xg) * 0.7 * kz, y: hands[1].y + (fRa.y + 0.15 - hands[1].y) * 0.7 * kz, z: hands[1].z + (fRa.z + 0.2 - hands[1].z) * 0.7 * kz };
+  }
+  if (safety > 0) {   // SAFETY：右手で右の板をつかむ
+    hands[1] = { xg: hands[1].xg + (fRa.xg + 0.12 - hands[1].xg) * safety, y: hands[1].y + (fRa.y + 0.05 - hands[1].y) * safety, z: hands[1].z + (fRa.z + 0.10 - hands[1].z) * safety };
+  }
   elbows = [ { xg: (shL.xg + hands[0].xg) / 2 - 0.10, y: (shL.y + hands[0].y) / 2 - 0.04, z: (shL.z + hands[0].z) / 2 - 0.02 },
              { xg: (shR.xg + hands[1].xg) / 2 + 0.10, y: (shR.y + hands[1].y) / 2 - 0.04, z: (shR.z + hands[1].z) / 2 - 0.02 } ];
   for (var hi = 0; hi < 2; hi++) {
@@ -5248,12 +5272,19 @@ function fvSkier(){
   // 板：ターンでは脚の振れる向きへ板先を向ける。スプレッドでは V に開く
   var skis = [];
   var hd0 = heading !== null ? heading : lean * 0.28;
-  var heads = [hd0 - 0.30 * sp, hd0 + 0.30 * sp];   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
+  if (airH > 0.05) hd0 = 0;
+  // スプレッドは V、アイアンクロスは × に交差（左の板の先が右へ）
+  var heads = [hd0 - 0.30 * sp + 0.75 * ix, hd0 + 0.30 * sp - 0.75 * ix];
+  var skiPitch = 1.25 * bs - 0.35 * kz;   // ＋＝板先が下（バックスクラッチャー）、−＝板先が上（コザック）   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
   [fL, fR].forEach(function(f, idx){
     var a = heads[idx], sx = Math.sin(a), cz = Math.cos(a);
     var tipZ = f.z + cz * 0.88, tailZ = f.z - cz * 0.80, tipX = f.xg + sx * 0.88, tailX = f.xg - sx * 0.80;
     var yT, yB;
-    if (airH > 0.05) { yT = f.y + 0.10; yB = f.y - 0.02; }
+    if (airH > 0.05) {
+      var cp = Math.cos(skiPitch), spp = Math.sin(skiPitch);
+      tipZ = f.z + cz * 0.88 * cp; tailZ = f.z - cz * 0.80 * cp; tipX = f.xg + sx * 0.88 * cp; tailX = f.xg - sx * 0.80 * cp;
+      yT = f.y + 0.10 - 0.88 * spp; yB = f.y - 0.02 + 0.80 * spp;
+    }
     else { yT = fvGround(tipX, tipZ) + 0.05; yB = fvGround(tailX, tailZ) + 0.02; }
     skis.push({ tip: { xg: tipX, y: yT, z: tipZ }, tail: { xg: tailX, y: yB, z: tailZ }, foot: f });
   });
@@ -5586,6 +5617,25 @@ document.getElementById('btnReplayView').addEventListener('click', function(){
   var i = FV_VIEWS.indexOf(REPLAY.view);
   replaySetView(FV_VIEWS[(i + 1) % FV_VIEWS.length]);
 });
+/* ★試作4 前からの視点だけ、記録したコマとコマの間をなめらかにつなぐ（位置・吸収・エアの進みを時刻で按分）。
+   いつもの視点は v8.2 と同じ絵のまま（按分しない）。数や文字の出る値（点・回数）は按分しない */
+var FV_LERP_G = ['playerD', 'time', 'fallAnim'];
+var FV_LERP_P = ['x', 'sway', 'line', 'lean', 'comp', 'compQ', 'buck', 'poleT'];
+var FV_LERP_A = ['u', 'poseE', 'openT', 'rot', 'grabT'];
+function fvLerp(now){
+  var fr = REPLAY.frames, i = REPLAY.idx;
+  if (i < 0 || i + 1 >= fr.length) return;
+  var a = fr[i], b = fr[i + 1], span = b.t - a.t; if (!(span > 0)) return;
+  var f = clamp((fr[0].t + (now - REPLAY.t0) / 1000 - a.t) / span, 0, 1);
+  var mix = function(o, x, y, keys){
+    for (var k = 0; k < keys.length; k++) { var p = x[keys[k]], q = y[keys[k]]; if (typeof p === 'number' && typeof q === 'number') o[keys[k]] = p + (q - p) * f; }
+  };
+  mix(G, a.g, b.g, FV_LERP_G);
+  mix(G.player, a.p, b.p, FV_LERP_P);
+  for (var j = 0; j < G.airs.length; j++) {
+    if (G.airs[j] && a.a[j] && b.a[j] && a.a[j].stage === b.a[j].stage) mix(G.airs[j], a.a[j], b.a[j], FV_LERP_A);
+  }
+}
 
 
 /* =========================================================================
