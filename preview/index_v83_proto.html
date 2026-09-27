@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.3 試作（前から見る視点・未反映。v8.2 がもと） -->
+<!-- MOGUL CHALLENGE v8.3 試作2（前から見る視点・未反映。v8.2 がもと） -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -5096,6 +5096,7 @@ function fvPrepare(){
     }
   }
   FV.trees = t;
+  fvPrepareGrid();
 }
 // 斜面の高さ。ゴールから先は緩い平らな場所（6°）にする（案B のカメラがゴールの先に立つため）
 var FV_TAN_OUT = Math.tan(6 * Math.PI / 180);
@@ -5224,7 +5225,7 @@ function fvSkier(){
   }
   // 板：ターンでは脚の振れる向きへ板先を向ける。スプレッドでは V に開く
   var skis = [];
-  var heads = [lean * 0.42 - 0.30 * sp, lean * 0.42 + 0.30 * sp];
+  var heads = [lean * 0.28 - 0.30 * sp, lean * 0.28 + 0.30 * sp];   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
   [fL, fR].forEach(function(f, idx){
     var a = heads[idx], sx = Math.sin(a), cz = Math.cos(a);
     var tipZ = f.z + cz * 0.88, tailZ = f.z - cz * 0.80, tipX = f.xg + sx * 0.88, tailX = f.xg - sx * 0.80;
@@ -5255,70 +5256,94 @@ var FV_HEAD = 1.80;   // 吸収がそろっているときの頭の高さ（斜�
 function fvMakeCam(mode, st){
   var H = view.H, aim = fvBase(st.zs) + 0.95 + st.airH;
   if (mode === 'frontB') {
-    // 案B：ゴールの先の高い位置に固定。向きだけ選手を追う（ズームしない）
-    var zF = G.finishD / FV.ppm + 16;
-    var camB = fvCamera({ xg: -4.5, y: fvBase(zF) + 4.0, z: zF }, { xg: st.hip.xg, y: aim, z: st.zs }, H * 3.2);
-    camB.cy = H * 0.42;   // ゴールが近づいたとき、手前のゴールゲートが下の表示に隠れないよう少し上に置く
-    return camB;
+    // 案B：ゴールの 14 m 先、ゴールとほぼ同じ高さに固定。向きだけ選手を追う（ズームしない）。城さん OK の見え方（2026-09-27）
+    var zF = G.finishD / FV.ppm + 14;
+    return fvCamera({ xg: -4.5, y: -zF * FV.tan + 6.0, z: zF }, { xg: st.hip.xg, y: aim, z: st.zs }, H * 2.6);
   }
-  // 案A：選手の 8.5 m 下（前）から追う。横は半分だけ追い、高さは斜面に沿って動かす
-  var zc = st.zs + 10;
-  var cam = fvCamera({ xg: st.hip.xg * 0.55, y: fvBase(st.zs) + 2.3 + st.airH * 0.6, z: zc },
-                     { xg: st.hip.xg * 0.85, y: aim, z: st.zs }, H * 1.35);
-  cam.cy = H * 0.56;   // 上の表示に頭がかからないよう、少し下に置く
+  // 案A：案B と同じ見え方のまま、選手の 20 m 下（前）について下りる。コブの列がコース幅いっぱいに見える（城さん 2026-09-27）
+  var D = 20;
+  var cam = fvCamera({ xg: st.hip.xg * 0.3 - 1.5, y: fvBase(st.zs) - D * FV.tan + 6.0 + st.airH * 0.5, z: st.zs + D },
+                     { xg: st.hip.xg * 0.6, y: aim, z: st.zs }, H * 2.6);
+  cam.cy = H * 0.54;
   return cam;
 }
-
-/* ---- コブ：陰影を付けた絵を一度だけ作り、位置と大きさを合わせて貼る（軽い） ----
-   足元の高さ（fvGround）と同じ位置・幅・高さに合わせるので、板がコブに乗って見える */
-var FV_BUMP_IMG = null;
-function fvBumpImage(){
-  if (FV_BUMP_IMG) return FV_BUMP_IMG;
-  var c = document.createElement('canvas'); c.width = 256; c.height = 160;
-  var x = c.getContext('2d');
-  // 手前（谷側）の削れた溝の影
-  var tg = x.createRadialGradient(128, 130, 10, 128, 130, 128);
-  tg.addColorStop(0, 'rgba(118,146,180,.50)'); tg.addColorStop(0.7, 'rgba(118,146,180,.16)'); tg.addColorStop(1, 'rgba(118,146,180,0)');
-  x.fillStyle = tg; x.beginPath(); x.ellipse(128, 128, 126, 30, 0, 0, Math.PI * 2); x.fill();
-  // コブの本体：丸い山。左上から光、右と手前の下を陰にする
-  x.save(); x.beginPath(); x.ellipse(128, 104, 118, 78, 0, Math.PI, 0); x.ellipse(128, 104, 118, 26, 0, 0, Math.PI); x.closePath(); x.clip();
-  var lg = x.createLinearGradient(10, 0, 246, 0);
-  lg.addColorStop(0, '#e6eef6'); lg.addColorStop(0.3, '#ffffff'); lg.addColorStop(0.62, '#e2eaf3'); lg.addColorStop(1, '#a8bcd2');
-  x.fillStyle = lg; x.fillRect(0, 0, 256, 160);
-  var vg = x.createLinearGradient(0, 26, 0, 130);
-  vg.addColorStop(0, 'rgba(160,182,208,0)'); vg.addColorStop(0.6, 'rgba(160,182,208,0)'); vg.addColorStop(1, 'rgba(140,165,196,.5)');
-  x.fillStyle = vg; x.fillRect(0, 0, 256, 160);
-  x.restore();
-  // 頂上の光
-  var hg = x.createRadialGradient(100, 50, 2, 100, 50, 64);
-  hg.addColorStop(0, 'rgba(255,255,255,.95)'); hg.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = hg; x.beginPath(); x.ellipse(110, 62, 80, 40, 0, 0, Math.PI * 2); x.fill();
-  // 小さく貼るとき用に縮めた絵も作っておく（縮小のたびに計算しないように）
-  var mips = [c];
-  for (var w = 128; w >= 16; w /= 2) {
-    var m = document.createElement('canvas'); m.width = w; m.height = Math.round(w * 160 / 256);
-    m.getContext('2d').drawImage(mips[mips.length - 1], 0, 0, m.width, m.height);
-    mips.push(m);
+/* ---- 雪面（高さの網を奥から手前へ塗る。陰影でコブの列を見せる） ---- */
+var FV_SHADES = (function(){
+  var a = [];
+  for (var i = 0; i <= 47; i++) {
+    var t = i / 47;
+    a.push('rgb(' + Math.round(128 + 127 * t) + ',' + Math.round(152 + 103 * t) + ',' + Math.round(186 + 69 * t) + ')');
   }
-  FV_BUMP_IMG = mips;
-  return mips;
+  return a;
+})();
+var FV_L = (function(){ var x = 0.5, y = 0.8, z = 0.45, l = Math.sqrt(x * x + y * y + z * z); return [x / l, y / l, z / l]; })();
+function fvShade(dhx, dhz){
+  var nx = -dhx, ny = 1, nz = -dhz, l = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  var s = 0.30 + 0.70 * Math.max(0, (nx * FV_L[0] + ny * FV_L[1] + nz * FV_L[2]) / l);
+  return Math.max(0, Math.min(47, Math.round(s * 47)));
 }
-function fvDrawBump(cam, q){
-  var y0 = fvBase(q.z);
-  var T = fvP(cam, q.x, y0 + q.h, q.z);
-  var L = fvP(cam, q.x + FV.bumpSx * 1.7, y0, q.z), R = fvP(cam, q.x - FV.bumpSx * 1.7, y0, q.z);
-  var N = fvP(cam, q.x, fvBase(q.z + FV.bumpSz * 1.2), q.z + FV.bumpSz * 1.2);
-  if (!T || !L || !R || !N) return;
-  var w = Math.abs(R.x - L.x); if (w < 1.5) return;
-  var cx = (L.x + R.x) / 2, top = T.y, bot = Math.max(N.y, (L.y + R.y) / 2);
-  var hgt = Math.max(2, bot - top);
-  if (cx + w < -10 || cx - w > view.W + 10 || bot < -10 || top > view.H + 10) return;
-  // 絵は幅 256 のうち本体が 236、高さ 160 のうち頂上 26 → 手前の下端 130
-  var sx = w / 236, sy = hgt / 104, dw = 256 * sx * view.scale * view.dpr;
-  var mips = fvBumpImage(), mi = 0;
-  while (mi + 1 < mips.length && mips[mi + 1].width >= dw) mi++;
-  ctx.drawImage(mips[mi], cx - 128 * sx, top - 26 * sy, 256 * sx, 160 * sy);
+/* 雪面の高さは、リプレイを始めるときに 0.4 m × 0.35 m の網で一度だけ計算しておく（毎コマは計算しない）。
+   遠いところは網を 2・4・8…と間引いて塗る */
+var FV_XMAX = 8.0, FV_GDX = 0.4, FV_GDZ = 0.35;
+var FV_GRID = null;
+function fvPrepareGrid(){
+  var nx = Math.round(2 * FV_XMAX / FV_GDX) + 1, z0 = -32, z1 = G.finishD / FV.ppm + 24;
+  var nz = Math.ceil((z1 - z0) / FV_GDZ) + 1, h = new Float32Array(nx * nz);
+  for (var i = 0; i < nz; i++) { var z = z0 + i * FV_GDZ; for (var j = 0; j < nx; j++) h[i * nx + j] = fvGround(-FV_XMAX + j * FV_GDX, z); }
+  FV_GRID = { nx: nx, nz: nz, z0: z0, h: h };
 }
+function fvRowData(cam, i, step, cache){
+  var key = i + '|' + step, r = cache[key];
+  if (r) return r;
+  var g = FV_GRID, z = g.z0 + i * FV_GDZ, n = Math.floor((g.nx - 1) / step), h = new Array(n + 1), p = new Array(n + 1);
+  for (var j = 0; j <= n; j++) { h[j] = g.h[i * g.nx + j * step]; p[j] = fvP(cam, -FV_XMAX + j * step * FV_GDX, h[j], z); }
+  r = { z: z, dx: step * FV_GDX, n: n, h: h, p: p };
+  cache[key] = r;
+  return r;
+}
+/* 手前から奥へ、網の行を 2 本ずつ組にして返す（遠いほど間引く） */
+function fvStrips(cam, zFar, zNear){
+  var g = FV_GRID, out = [], cache = {};
+  var i = Math.min(g.nz - 1, Math.floor((zNear - g.z0) / FV_GDZ)), iFar = Math.max(0, Math.floor((zFar - g.z0) / FV_GDZ));
+  var yAt = function(k){ var z = g.z0 + k * FV_GDZ, p = fvP(cam, 0, fvBase(z), z); return p ? p.y : null; };
+  while (i > iFar) {
+    // 画面の上で 1 本の帯が 5px 以上になるまで行を間引く（見た目が変わらない範囲で塗る数を減らす）
+    var y0 = yAt(i), step = 1;
+    while (step < 32 && i - step * 2 > iFar) { var y1 = yAt(i - step * 2); if (y0 === null || y1 === null || Math.abs(y0 - y1) >= 5) break; step *= 2; }
+    var i2 = Math.max(iFar, i - step);
+    var dist = Math.max(1, cam.z - (g.z0 + i * FV_GDZ)), cs = dist < 12 ? 1 : 2;
+    out.push({ near: fvRowData(cam, i, cs, cache), far: fvRowData(cam, i2, cs, cache) });
+    i = i2;
+  }
+  return out;
+}
+var FV_GROUPS = [];
+function fvDrawStrip(cam, s){
+  var A = s.near, B = s.far, n = Math.min(A.n, B.n), dz = A.z - B.z, dx = A.dx, j, lv, used = [];
+  for (j = 0; j < n; j++) {
+    var a = A.p[j], b = A.p[j + 1], c = B.p[j + 1], d = B.p[j];
+    if (!a || !b || !c || !d) continue;
+    if (Math.max(a.y, b.y, c.y, d.y) < -4 || Math.min(a.y, b.y, c.y, d.y) > view.H + 4) continue;
+    if (Math.max(a.x, b.x, c.x, d.x) < -4 || Math.min(a.x, b.x, c.x, d.x) > view.W + 4) continue;
+    var dhx = ((A.h[j + 1] - A.h[j]) + (B.h[j + 1] - B.h[j])) / (2 * dx);
+    var dhz = ((A.h[j] - B.h[j]) + (A.h[j + 1] - B.h[j + 1])) / (2 * dz);
+    lv = fvShade(dhx, dhz);
+    var g = FV_GROUPS[lv] || (FV_GROUPS[lv] = []);
+    if (!g.length) used.push(lv);
+    g.push(a, b, c, d);
+  }
+  for (var u = 0; u < used.length; u++) {
+    lv = used[u]; var q = FV_GROUPS[lv];
+    ctx.fillStyle = FV_SHADES[lv];
+    ctx.beginPath();
+    for (j = 0; j < q.length; j += 4) {
+      ctx.moveTo(q[j].x, q[j].y); ctx.lineTo(q[j + 1].x, q[j + 1].y); ctx.lineTo(q[j + 2].x, q[j + 2].y); ctx.lineTo(q[j + 3].x, q[j + 3].y); ctx.closePath();
+    }
+    ctx.fill();
+    q.length = 0;
+  }
+}
+
 function fvDrawKicker(cam, a){
   var zl = a.dLip / FV.ppm, z0 = zl - 2.4, w = 1.8;
   var P = function(xg, h, z){ return fvP(cam, xg, fvBase(z) + h, z); };
@@ -5357,16 +5382,21 @@ function fvDrawTree(cam, t){
   ctx.fillStyle = '#2f5d4a';
   ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(b.x - w, b.y); ctx.lineTo(b.x + w, b.y); ctx.closePath(); ctx.fill();
 }
-function fvDrawFinish(cam){
+function fvDrawFinish(cam, st){
   var z = G.finishD / FV.ppm, w = FV.courseHalf + 0.6, y = fvBase(z);
   fvLine(cam, { xg: -w, y: y, z: z }, { xg: -w, y: y + 3.2, z: z }, 0.14, '#39424e');
   fvLine(cam, { xg: w, y: y, z: z }, { xg: w, y: y + 3.2, z: z }, 0.14, '#39424e');
   var a = fvP(cam, w, y + 3.2, z), b = fvP(cam, -w, y + 2.4, z); if (!a || !b) return;
   var x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+  // 選手がゴールの幕の後ろにいて重なるときは、幕を薄くして選手を見せる
+  var hd = fvP(cam, st.head.xg, st.head.y, st.head.z), ft = fvP(cam, st.shadowX, st.groundY, st.zs);
+  var hide = st.zs < z && hd && ft && Math.max(hd.y, ft.y) > a.y && Math.min(hd.y, ft.y) < b.y && hd.x > x0 - 20 && hd.x < x1 + 20;
+  ctx.globalAlpha = hide ? 0.28 : 1;
   ctx.fillStyle = '#d8382c'; ctx.fillRect(x0, a.y, x1 - x0, b.y - a.y);
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
   ctx.font = '900 ' + Math.max(7, Math.round((b.y - a.y) * 0.62)) + 'px system-ui,sans-serif';
   ctx.fillText('FINISH', (x0 + x1) / 2, b.y - (b.y - a.y) * 0.2); ctx.textAlign = 'left';
+  ctx.globalAlpha = 1;
   var l = fvP(cam, -FV.courseHalf, y + 0.01, z), r = fvP(cam, FV.courseHalf, y + 0.01, z);
   if (l && r) { ctx.strokeStyle = 'rgba(216,56,44,.8)'; ctx.lineWidth = Math.max(1, 0.12 * l.s); ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.stroke(); }
 }
@@ -5452,9 +5482,10 @@ function renderFront(){
   for (var mx = -40; mx <= W + 40; mx += 20) ctx.lineTo(mx, yTop - 14 - 30 * Math.abs(Math.sin(mx * 0.019 + 1.3)) - 12 * Math.abs(Math.sin(mx * 0.061)));
   ctx.lineTo(W + 40, yTop + 2); ctx.closePath(); ctx.fill();
   // 斜面（平面）。奥は霞ませる
-  var sg = ctx.createLinearGradient(0, yTop, 0, H);
-  sg.addColorStop(0, '#d3e0ec'); sg.addColorStop(0.35, '#eaf1f8'); sg.addColorStop(1, '#f8fbfe');
-  ctx.fillStyle = sg; ctx.fillRect(-40, yTop, W + 80, H + 80);
+  ctx.fillStyle = FV_SHADES[fvShade(0, -FV.tan)]; ctx.fillRect(-40, yTop, W + 80, H + 80);
+  var sg = ctx.createLinearGradient(0, yTop, 0, yTop + 60);
+  sg.addColorStop(0, 'rgba(190,210,230,.8)'); sg.addColorStop(1, 'rgba(190,210,230,0)');
+  ctx.fillStyle = sg; ctx.fillRect(-40, yTop, W + 80, 60);
   var dOf = function(xg, y, z){ var vx = -xg - cam.x, vy = y - cam.y, vz = z - cam.z; return vx * cam.fx + vy * cam.fy + vz * cam.fz; };
   var zNear = cam.z - 1.0, zEnd = G.finishD / FV.ppm, k;
   // コースの端（点線）
@@ -5467,14 +5498,15 @@ function renderFront(){
   ctx.setLineDash([]);
   // 奥から手前へ（カメラからの距離の大きい順）
   var items = [];
-  for (k = 0; k < FV.bumps.length; k++) {
-    var b = FV.bumps[k]; if (b.z > zNear) continue;
-    var dd = dOf(b.x, fvBase(b.z), b.z);
-    if (dd > 0.8 && dd < 420) items.push({ d: dd, t: 0, o: b });
+  var zFarRow = REPLAY.view === 'frontB' ? -30 : Math.max(-30, st.zs - 120);
+  var strips = fvStrips(cam, zFarRow, cam.z - 0.5);
+  for (k = 0; k < strips.length; k++) {
+    var zm = (strips[k].near.z + strips[k].far.z) / 2, dm = dOf(0, fvBase(zm), zm);
+    if (dm > 0.4) items.push({ d: dm, t: 0, o: strips[k] });
   }
   for (k = 0; k < FV.trees.length; k++) {
     var t = FV.trees[k], dt2 = dOf(t.x, fvBase(t.z), t.z);
-    if (dt2 > 1 && dt2 < 500) items.push({ d: dt2, t: 1, o: t });
+    if (dt2 > (REPLAY.view === 'frontA' ? 16 : 1) && dt2 < 500) items.push({ d: dt2, t: 1, o: t });   // 案A はカメラのすぐ横の木を描かない（画面をふさぐため）
   }
   var gateStep = gapPx * CONFIG.gateEveryGaps / FV.ppm;
   for (var gi = 1; gi * gateStep < zEnd; gi++) {
@@ -5487,15 +5519,15 @@ function renderFront(){
   }
   var fd = dOf(0, fvBase(zEnd), zEnd); if (fd > 1) items.push({ d: fd, t: 4 });
   // 選手は足元より 0.5 m 手前の距離で並べる（足元のコブより前に描く）
-  items.push({ d: dOf(st.hip.xg, fvBase(st.zs + 0.5), st.zs + 0.5), t: 5 });
+  items.push({ d: dOf(st.hip.xg, fvBase(st.zs + 1.0), st.zs + 1.0) - 0.02, t: 5 });
   items.sort(function(p, q){ return q.d - p.d; });
   for (k = 0; k < items.length; k++) {
     var it = items[k];
-    if (it.t === 0) fvDrawBump(cam, it.o);
+    if (it.t === 0) fvDrawStrip(cam, it.o);
     else if (it.t === 1) fvDrawTree(cam, it.o);
     else if (it.t === 2) { fvDrawGate(cam, -FV.courseHalf, it.o.z, it.o.col); fvDrawGate(cam, FV.courseHalf, it.o.z, it.o.col); }
     else if (it.t === 3) fvDrawKicker(cam, it.o);
-    else if (it.t === 4) fvDrawFinish(cam);
+    else if (it.t === 4) fvDrawFinish(cam, st);
     else { fvDrawSpray(cam, st); fvDrawSkier(cam, st); if (REPLAY.view === 'frontA') fvDrawHeadGuide(cam, st); }
   }
   // 案B で選手が小さいときは輪で示す
