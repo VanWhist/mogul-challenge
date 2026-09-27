@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.1 -->
+<!-- MOGUL CHALLENGE v8.2 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -200,6 +200,8 @@
   .tsLine span{position:absolute;right:4px;top:-6px;font-size:8px;line-height:11px;color:#ffd479;
     background:#0b1826;padding:0 4px;letter-spacing:.06em;}
   #resBtnRow .bigbtn.cmp{padding:12px 16px;letter-spacing:.06em;}
+  /* ★v8.2 REPLAY は「次の大会へ」「もう一度」「RETRY」より目立たせない（城さん指示 2026-09-27）。枠も字も一段弱く */
+  #resBtnRow .bigbtn.rp{border-color:rgba(143,180,212,.32);color:#8fb4d4;font-size:11px;letter-spacing:.1em;padding:12px 18px;}
   #resBtnRow,#startBtnRow,#startSubRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   /* START は主操作なので単独の行。RANKING / HELP は 1 段下げて小さく（§19.5） */
   .bigbtn.sm{font-size:11px;padding:9px 14px;margin-top:9px;letter-spacing:.08em;}
@@ -382,6 +384,13 @@
   #btnrow button{min-height:44px;padding:0 14px;}
   /* ★v7.8 2 つを同じ幅にして、中央の左右で押せない範囲をそろえる */
   #btnRestart,#btnHome{min-width:78px;}
+  /* ★v8.2 リプレイ（§32.11）。再生中は RESTART / HOME を隠し、「REPLAY」と「閉じる」だけにする */
+  #replayTag,#btnReplayClose{display:none;}
+  body.replaying #btnRestart,body.replaying #btnHome{display:none;}
+  body.replaying #replayTag{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:900;
+    letter-spacing:.18em;color:#c0392b;padding:0 6px;}
+  body.replaying #replayTag::before{content:'';width:8px;height:8px;border-radius:50%;background:#c0392b;}
+  body.replaying #btnReplayClose{display:inline-block;min-width:78px;}
   button{appearance:none;border:1px solid rgba(13,27,42,.18);background:rgba(255,255,255,.9);
     color:#0d1b2a;font-size:9px;font-weight:700;letter-spacing:.08em;padding:6px 9px;
     border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
@@ -464,6 +473,8 @@
         <button id="tutSkip" type="button">SKIP</button>
         <button id="btnRestart" type="button">RESTART</button>
         <button id="btnHome" type="button">HOME</button>
+        <span id="replayTag">REPLAY</span>
+        <button id="btnReplayClose" type="button">閉じる</button>
       </span>
     </div>
   </div>
@@ -651,6 +662,7 @@
         <button class="bigbtn" id="btnNext" type="button" hidden>次の大会へ</button>
         <button class="bigbtn" id="btnRetry" type="button">RETRY</button>
         <button class="bigbtn ghost" id="btnResHome" type="button">HOME</button>
+        <button class="bigbtn ghost rp" id="btnReplay" type="button" hidden>REPLAY</button>
       </div>
       <div class="spBand" id="spResult"></div>
 
@@ -1429,6 +1441,7 @@ function resetGame(){
     particles: [],
     hudAcc: 999
   };
+  replayReset();           // ★v8.2 前のランのリプレイ記録は捨てる（§32.11）
   showJudge(null);
   hideOverlays();
   tutCleanupUi();          // チュートリアルの表示を必ず消す（§19.7）。G は作り直されるので tut も消える
@@ -2281,6 +2294,7 @@ function eventTimeMs(e){
      指が重なるたびに 1 本まるごと落ちる（実測：62 タップ中 9 回が消えた）。
    → pointerdown は 1 回 = 1 入力として必ず受ける。 */
 function pressDir(dir, tMs, viaPointer){
+  if (REPLAY.active) return;                             // ★v8.2 リプレイ中は滑りの入力を受け付けない
   if (!viaPointer && heldDirs.size > 0 && !heldDirs.has(dir)) return;
   heldDirs.add(dir);
   handleTurnInput(dir, tMs);
@@ -2401,6 +2415,7 @@ document.getElementById('btnWindows').addEventListener('click', function(){
    演出
    ========================================================================= */
 function showJudge(R){
+  replayEv('judge', R);                                  // ★v8.2 リプレイで同じ文字を出すため
   if (!R) { elJudge.className = 'hud'; elJudge.textContent = ''; return; }
   elJudge.className = 'hud';
   elJudge.textContent = R.label;
@@ -3056,12 +3071,13 @@ var SOUND_JUDGE = {
                          thud(0.16, 0.55, 320); },
   whiff:     function(){ carve({ f0: 900, f1: 800, q:2.0, dur:0.07, vol:0.30, atk:0.010 }); }
 };
-function playJudge(kind){ var f = SOUND_JUDGE[kind]; if (f) f(); }
+function playJudge(kind){ replayEv('sJudge', kind); var f = SOUND_JUDGE[kind]; if (f) f(); }
 
 /* 構えを作る＝板を雪面に置き直す音。短く柔らかいブラシ */
-function playAirSet(){ carve({ f0:1300, f1:1800, q:0.9, dur:0.16, vol:0.55, atk:0.05 }); }
+function playAirSet(){ replayEv('sSet'); carve({ f0:1300, f1:1800, q:0.9, dur:0.16, vol:0.55, atk:0.05 }); }
 
 function playAirLand(k){
+  replayEv('sLand', k);
   if (k === 'perfect')   { thud(0.20, 0.75, 900); carve({ f0:1800, f1:2800, q:1.1, dur:0.26, vol:0.85, atk:0.02 }); }
   else if (k === 'good') { thud(0.20, 0.70, 760); carve({ f0:1400, f1:2100, q:1.3, dur:0.24, vol:0.70, atk:0.03 }); }
   else if (k === 'deep') { thud(0.24, 0.75, 560); carve({ f0: 900, f1:1200, q:1.8, dur:0.22, vol:0.55, atk:0.04 }); }
@@ -3071,6 +3087,7 @@ function playAirLand(k){
 
 /* フィニッシュ＝止まるときの横滑り。長く抜けていく一発 */
 function playFinish(){
+  replayEv('sFinish');
   carve({ f0:2600, f1:600, q:0.8, dur:0.85, vol:1.0, atk:0.09 });
 }
 
@@ -3632,7 +3649,8 @@ function showResult(){
     'TURN ' + CONFIG.turnScoreMax + ' ＋ AIR ' + CONFIG.airScoreMax +
     ' ＋ TIME ' + CONFIG.timeScoreMax + ' ＝ ' + CONFIG.totalScoreMax +
     '（この構成の上限は ' + mxNow.total.toFixed(1) + '）';
-  renderResultMode(s);                               // ★v8.0 ツアーなら順位表とボタン
+  renderResultMode(s);
+  replayOnResult();                                   // ★v8.2 記録を閉じ、REPLAY ボタンを出す（§32.11）                               // ★v8.0 ツアーなら順位表とボタン
   elResultOv.classList.remove('hidden');
 }
 
@@ -4881,10 +4899,142 @@ if (window.ResizeObserver) {
    メインループ
    ========================================================================= */
 function frame(now){
-  update(now);
-  render();
+  // ★v8.2 リプレイ中は update（判定・採点・動き）を一度も呼ばない。記録を描くだけ（§32.11）
+  if (REPLAY.active) { replayStep(now); render(); }
+  else { update(now); render(); replayRecord(); }
   requestAnimationFrame(frame);
 }
+
+/* =========================================================================
+   ★v8.2 リプレイ（§32.11）
+   滑っている間、描画に使う状態を 1 コマずつメモリに記録し、リザルトの REPLAY で描き直す。
+   ・再生中は G を「見返し用の入れ物」に差し替え、update を呼ばない
+     → 判定・採点・records.v1・tour.v1・リザルトの点には、仕組みの上で触れない
+   ・入力を記録して判定をもう一度走らせる方式は使わない（コマの時間の揺れで結果が変わるため）
+   ・記録はメモリだけ。localStorage にもサーバーにも出さない。次のランを始めたら捨てる
+   ・チュートリアルと、チュートリアルから続けたランは記録しない
+   ========================================================================= */
+var REPLAY = {
+  g: null,            // 記録している G（resetGame で作り直されたら別のラン）
+  frames: [],         // 1 コマ＝{ t, g, p, c, a, pt }
+  ev: [],             // 文字と音の出来事 { i: コマ番号, type, arg }
+  mAt: [],            // コブごとの「判定が付いたコマ」
+  mRes: [], mTime: [],
+  done: false,        // リザルトが出たら記録を閉じる
+  active: false,      // 再生中
+  realG: null, t0: 0, idx: -1, evIdx: 0, endAt: null, hudAcc: 0
+};
+var REPLAY_MAX_FRAMES = 12000;   // 念のための上限（60 コマ/秒で 200 秒）
+
+function replayReset(){
+  REPLAY.g = G; REPLAY.frames = []; REPLAY.ev = []; REPLAY.mAt = []; REPLAY.mRes = []; REPLAY.mTime = [];
+  REPLAY.done = false;
+  var rb = document.getElementById('btnReplay'); if (rb) rb.hidden = true;
+}
+function replayRecording(){
+  return !REPLAY.active && !REPLAY.done && G && REPLAY.g === G && !G.tut && !G.fromTutorial &&
+         (G.phase === 'running' || G.phase === 'finished');
+}
+function replayEv(type, arg){
+  if (!replayRecording()) return;
+  REPLAY.ev.push({ i: REPLAY.frames.length, type: type, arg: arg });
+}
+function replayRecord(){
+  if (!replayRecording() || REPLAY.frames.length >= REPLAY_MAX_FRAMES) return;
+  var g = {}, k;
+  for (k in G) { var v = G[k]; if (v === null || typeof v !== 'object') g[k] = v; }
+  var a = [];
+  for (var i = 0; i < G.airs.length; i++) {
+    var src = G.airs[i], o = null;
+    if (src) { o = {}; for (k in src) { var w = src[k]; if (w === null || typeof w !== 'object') o[k] = w; } }
+    a.push(o);
+  }
+  var pt = new Array(G.particles.length);
+  for (i = 0; i < G.particles.length; i++) pt[i] = Object.assign({}, G.particles[i]);
+  var n = REPLAY.frames.length;
+  REPLAY.frames.push({ t: G.time, g: g, p: Object.assign({}, G.player), c: Object.assign({}, G.counts), a: a, pt: pt });
+  for (i = 0; i < G.moguls.length; i++) {
+    var m = G.moguls[i];
+    if (m.judged && REPLAY.mAt[i] === undefined) { REPLAY.mAt[i] = n; REPLAY.mRes[i] = m.result; REPLAY.mTime[i] = m.judgedAt; }
+  }
+}
+function replayAvailable(){
+  return REPLAY.g === G && REPLAY.frames.length > 1 && !!G && !G.fromTutorial && !!G.score &&
+         !(G.pbInfo && G.pbInfo.tutorial);
+}
+function replayOnResult(){
+  if (REPLAY.g === G) REPLAY.done = true;
+  document.getElementById('btnReplay').hidden = !replayAvailable();
+  document.getElementById('btnReplay').classList.toggle('cmp', !!(G.pbInfo && G.pbInfo.tour));
+}
+function replayApply(i){
+  var f = REPLAY.frames[i];
+  Object.assign(G, f.g);
+  Object.assign(G.player, f.p);
+  Object.assign(G.counts, f.c);
+  for (var k = 0; k < G.airs.length; k++) if (G.airs[k] && f.a[k]) Object.assign(G.airs[k], f.a[k]);
+  G.particles = f.pt;
+  for (var j = 0; j < G.moguls.length; j++) {
+    var m = G.moguls[j], at = REPLAY.mAt[j];
+    if (at !== undefined && at <= i) { m.judged = true; m.result = REPLAY.mRes[j]; m.judgedAt = REPLAY.mTime[j]; }
+    else { m.judged = false; m.result = null; m.judgedAt = -1; }
+  }
+}
+function replayFire(uptoIdx){
+  while (REPLAY.evIdx < REPLAY.ev.length && REPLAY.ev[REPLAY.evIdx].i <= uptoIdx) {
+    var e = REPLAY.ev[REPLAY.evIdx++];
+    if (e.type === 'judge') showJudge(e.arg);
+    else if (e.type === 'sJudge') playJudge(e.arg);
+    else if (e.type === 'sSet') playAirSet();
+    else if (e.type === 'sLand') playAirLand(e.arg);
+    else if (e.type === 'sFinish') playFinish();
+  }
+}
+function startReplay(){
+  if (REPLAY.active || !replayAvailable()) return;
+  var real = G, rg = Object.assign({}, real);
+  rg.player = Object.assign({}, real.player);
+  rg.counts = Object.assign({}, real.counts);
+  rg.airs = real.airs.map(function(x){ return x ? Object.assign({}, x) : x; });
+  rg.moguls = real.moguls.map(function(m){ return Object.assign({}, m); });
+  rg.particles = [];
+  REPLAY.realG = real; REPLAY.active = true;
+  G = rg;
+  heldDirs.clear(); pointerDirs.clear();
+  document.body.classList.add('replaying');
+  elResultOv.classList.add('hidden');
+  showJudge(null);
+  REPLAY.t0 = performance.now(); REPLAY.idx = -1; REPLAY.evIdx = 0; REPLAY.endAt = null; REPLAY.hudAcc = 999;
+  replayStep(REPLAY.t0);
+}
+function replayStep(now){
+  var fr = REPLAY.frames, n = fr.length;
+  var t = fr[0].t + (now - REPLAY.t0) / 1000;           // 記録した時刻どおりに進める（端末のコマ数に左右されない）
+  var i = Math.max(0, REPLAY.idx);
+  while (i + 1 < n && fr[i + 1].t <= t) i++;
+  if (i !== REPLAY.idx) {
+    replayApply(i);
+    replayFire(i);
+    REPLAY.idx = i;
+  }
+  REPLAY.hudAcc += 1;
+  if (REPLAY.hudAcc >= 6) { REPLAY.hudAcc = 0; updateHud(); }
+  if (i >= n - 1) {
+    if (REPLAY.endAt === null) REPLAY.endAt = now;
+    else if (now - REPLAY.endAt > 1000) closeReplay();     // 最後のコマで 1 秒止めてからリザルトへ戻る
+  }
+}
+function closeReplay(){
+  if (!REPLAY.active) return;
+  G = REPLAY.realG; REPLAY.realG = null; REPLAY.active = false;
+  heldDirs.clear(); pointerDirs.clear();
+  document.body.classList.remove('replaying');
+  showJudge(null);
+  updateHud();
+  elResultOv.classList.remove('hidden');               // ★showResult は呼ばない（点のカウントアップや記録をやり直さない）
+}
+document.getElementById('btnReplay').addEventListener('click', startReplay);
+document.getElementById('btnReplayClose').addEventListener('click', closeReplay);
 
 /* =========================================================================
    §21 スポンサー枠
