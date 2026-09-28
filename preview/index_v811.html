@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.10 -->
+<!-- MOGUL CHALLENGE v8.11 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -1237,7 +1237,10 @@ var CONFIG = {
   maxInputExtrapolation: 0.05,  // 入力タイムスタンプ外挿の上限(秒)（§22.5 の暴走防止）
   maxFrameDt:            0.10,  // 1フレームで進める上限(秒)（タブ復帰時の飛び防止）
   maxDpr:                2,     // 描画解像度の上限
-  gateEveryGaps:         7,     // ゲート間隔（基準間隔の本数）。7×3.5m=24.5m ≒ CL の 1/10。v3.0 で 3→7
+  /* ★v8.11 コントロールゲートは FIS の規定どおり「スタートとフィニッシュを含めて 11 本、1 本ごとにコースの 1/10」
+     （FIS Freestyle Skiing Judging Handbook 6204.1.6。城さんの指示 2026-09-28）。コース長が変われば間隔も変わる。
+     v8.10 までは 24.5 m ごとに固定（コース長によって 8〜11 本、スタート・フィニッシュのゲートなし）だった */
+  gateCount:            11,     // スタート（0）〜フィニッシュ（10）の 11 本
   gateHeight:            48,    // ゲートポールの高さ(px)
   gatePanelW:            21,    // ゲート旗の幅(px)
   gatePanelH:            14,    // ゲート旗の高さ(px)
@@ -1414,7 +1417,7 @@ var invariantIssues = [];
     }
   }
   // ゲート間隔が ICR の CF（CL の 1/10）から大きく外れていないか（§20.1）
-  var gateM = CONFIG.gateEveryGaps * CONFIG.mogulSpacingM;
+  var gateM = CONFIG.courseLengthM / (CONFIG.gateCount - 1);   // ★v8.11 コース長を等分
   var cfM   = CONFIG.courseLengthM * CONFIG.gateSpacingPctOfCL;
   if (Math.abs(gateM - cfM) / cfM > 0.15) {
     invariantIssues.push('ゲート間隔 ' + gateM.toFixed(1) + 'm が CF（CL の 1/10 = ' +
@@ -4363,11 +4366,10 @@ function render(){
   }
 
   // コントロールゲート（実際のモーグルコースの赤／青ゲート。判定には一切関与しない）
-  var gateStep = gapPx * CONFIG.gateEveryGaps;
-  var gStart = Math.ceil((G.playerD - (H - judgeY)) / gateStep);
-  var gEnd   = Math.floor((G.playerD + judgeY) / gateStep);
-  for (var gi = gEnd; gi >= gStart; gi--) {          // 奥から手前へ
-    var gy = judgeY - (gi * gateStep - G.playerD);
+  var gds = gateDs();                                 // ★v8.11 スタート〜フィニッシュの 11 本
+  for (var gi = gds.length - 1; gi >= 0; gi--) {      // 奥から手前へ
+    var gy = judgeY - (gds[gi] - G.playerD);
+    if (gy < -60 || gy > H + 60) continue;
     var gcol = (gi % 2 === 0) ? CONFIG.gateColorRed : CONFIG.gateColorBlue;
     drawGate(cx, gy, -1, gcol);
     drawGate(cx, gy,  1, gcol);
@@ -4426,6 +4428,13 @@ function drawNightFence(cx, judgeY, hwTop, hwBot, H){
     ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, gr, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fffdf2'; ctx.beginPath(); ctx.arc(x, y, 2.4 * s, 0, Math.PI * 2); ctx.fill();
   }
+}
+
+/* ★v8.11 コントロールゲートの位置(px)。0＝スタート、gateCount−1＝フィニッシュ。コース長を等分する */
+function gateDs(){
+  var n = CONFIG.gateCount - 1, out = [];
+  for (var k = 0; k <= n; k++) out.push(G.finishD * k / n);
+  return out;
 }
 
 /* コントロールゲート：コース左右の境界に立つ旗竿（赤／青）。視覚表現のみ */
@@ -6225,9 +6234,9 @@ function renderFront(){
     var t = FV.trees[k], dt2 = dOf(t.x, fvBase(t.z), t.z);
     if (dt2 > (REPLAY.view === 'frontA' ? 16 : 1) && dt2 < 500) items.push({ d: dt2, t: 1, o: t });   // 案A はカメラのすぐ横の木を描かない（画面をふさぐため）
   }
-  var gateStep = gapPx * CONFIG.gateEveryGaps / FV.ppm;
-  for (var gi = 1; gi * gateStep < zEnd; gi++) {
-    var gz = gi * gateStep, gd = dOf(0, fvBase(gz), gz);
+  var gdsF = gateDs();                                 // ★v8.11 スタート〜フィニッシュの 11 本
+  for (var gi = 0; gi < gdsF.length; gi++) {
+    var gz = gdsF[gi] / FV.ppm, gd = dOf(0, fvBase(gz), gz);
     if (gd > 1) items.push({ d: gd, t: 2, o: { z: gz, col: (gi % 2 === 0) ? CONFIG.gateColorRed : CONFIG.gateColorBlue } });
   }
   if (night) {   // ★v8.10 フェンス（3 m ごとの板）と照明（7 m ごと）
@@ -6447,13 +6456,13 @@ if (!debugMode) {
    ここでは、その難易度が diffTuning にあること・コース長で変わるゲート間隔・表の中身を検査する */
 (function checkTourTables(){
   var issues = [], lines = [];
-  var gateM = CONFIG.gateEveryGaps * CONFIG.mogulSpacingM;
   var keep = { a1: CONFIG.selectedAir1, a2: CONFIG.selectedAir2 };
   for (var i = 0; i < CONFIG.tour.length; i++) {
     var ev = CONFIG.tour[i], tag = ev.key;
     if (!CONFIG.diffTuning[ev.diff]) issues.push(tag + ': 難易度 ' + ev.diff + ' が diffTuning にありません');
     if (!(ev.courseM >= 200 && ev.courseM <= 270))
       issues.push(tag + ': コース長 ' + ev.courseM + 'm が ICR 規格（200〜270m）の外です');
+    var gateM = ev.courseM / (CONFIG.gateCount - 1);   // ★v8.11
     var cfM = ev.courseM * CONFIG.gateSpacingPctOfCL, dev = Math.abs(gateM - cfM) / cfM;
     if (dev > 0.15) issues.push(tag + ': ゲート間隔 ' + gateM.toFixed(1) + 'm が CF ' + cfM.toFixed(1) +
                                 'm から ' + (dev * 100).toFixed(1) + '% ずれています（15% 以内）');
