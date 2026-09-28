@@ -5351,13 +5351,25 @@ function fvPrepare(){
 }
 // 斜面の高さ。ゴールから先は緩い平らな場所（6°）にする（案B のカメラがゴールの先に立つため）
 var FV_TAN_OUT = Math.tan(6 * Math.PI / 180);
-/* 前からの視点の足の横の位置：ターンの頂点（FV.turns）の間を cos でつなぐ。頂点が 4.5 m 以上離れている区間（エアなど）は null */
+/* 前からの視点の足の横の位置：ターンの頂点（FV.turns）の間を cos でつなぐ。
+   ★v8.6 コブの列が途切れている所（スタートの前・エアの前後・ゴールの後）は、前の頂点から半コブ（1.75 m）で真ん中へ戻り、
+   次の頂点の半コブ手前から出ていく。v8.5 までは null を返して上から見る画面の横の動きに切り替えていたので、
+   切り替わる所で足が横に跳んでいた（城さん指摘 2026-09-28） */
+var FV_GAP_EASE = 1.75;
+/* コブとコブの間はどれだけ広くても（W杯は間隔がばらついて 5 m を超える所がある）ターンの頂点どうしをつなぐ。
+   真ん中へ戻すのは、エア・スタート・ゴールのようにコブの列が途切れている所だけ（9 m より広い所） */
+var FV_GAP_WIDE = 9.0;
+function fvEase01(u){ u = clamp(u, 0, 1); return (1 - Math.cos(Math.PI * u)) / 2; }
 function fvFootX(z){
-  var t = FV.turns; if (!t || !t.length) return null;
-  var lo = 0, hi = t.length - 1;
-  if (z < t[0].z || z > t[hi].z) return null;
+  var t = FV.turns; if (!t || !t.length) return 0;
+  var lo = 0, hi = t.length - 1, R = FV_GAP_EASE;
+  if (z <= t[0].z)  return FV_SWING * t[0].e  * fvEase01(1 - (t[0].z - z) / R);
+  if (z >= t[hi].z) return FV_SWING * t[hi].e * (1 - fvEase01((z - t[hi].z) / R));
   while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (t[mid].z <= z) lo = mid; else hi = mid; }
-  var a = t[lo], c = t[hi]; if (c.z - a.z > 4.5) return null;
+  var a = t[lo], c = t[hi];
+  if (c.z - a.z > FV_GAP_WIDE) {
+    return FV_SWING * (a.e * (1 - fvEase01((z - a.z) / R)) + c.e * fvEase01(1 - (c.z - z) / R));
+  }
   var u = (z - a.z) / Math.max(0.01, c.z - a.z), w = (1 - Math.cos(Math.PI * u)) / 2;
   return FV_SWING * (a.e + (c.e - a.e) * w);
 }
