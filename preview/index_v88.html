@@ -437,8 +437,9 @@
   body.replaying #replayTag::before{content:'';width:8px;height:8px;border-radius:50%;background:#c0392b;}
   body.replaying #btnReplayClose{display:inline-block;min-width:78px;}
   /* ★v8.8 画面の中央より少し上に「REPLAY」（城さん）。押せない・触れても何も起きない。見本（sampling）では出さない */
-  /* 技名・PERFECT SET（#airInfo：上から 27%＋約 65px）の下に置く。背の低い画面でも重ならないように max() */
-  #replayBig{position:absolute;left:0;right:0;top:max(36%, calc(27% + 72px));z-index:3;display:none;text-align:center;pointer-events:none;}
+  /* ★r3（城さん「もう少し上」）：技名・PERFECT SET（#airInfo：上から 27%）のすぐ上に置く。
+     上の HUD（BALANCE の枠の下 ≒ 112px）にはかからないよう、最低 120px */
+  #replayBig{position:absolute;left:0;right:0;top:max(120px, calc(27% - 40px));z-index:3;display:none;text-align:center;pointer-events:none;}
   body.replaying #replayBig{display:block;}
   #replayBig{font-size:15px;font-weight:900;letter-spacing:.32em;color:#fff;}
   #replayBig::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;vertical-align:1px;}
