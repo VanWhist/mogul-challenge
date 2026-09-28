@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.8 -->
+<!-- MOGUL CHALLENGE v8.9 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -5619,6 +5619,19 @@ var FV_SPIN_TRICKS = { '360':'yaw', backFull:'full', dblFull:'full', cork720:'co
    yaw：+1＝左回り（上から見て反時計回り）／flip：+1＝後ろ宙返り（頭が山側へ）／corkTilt：コークの軸を縦から倒す角度（度、＋＝選手の右へ）
    twist：バックフルのひねりの向き（+1＝左） */
 var FV_SPIN_DIR = { yaw: 1, flip: 1, twist: 1, corkTilt: 30 };
+/* ★v8.9 城さんの動画（2026-09-28、ダブルフル／コーク 1080 を前から撮ったもの）に合わせた形。前から見る視点だけ
+   ・ダブルフル：体を伸ばしたまま（レイアウト。膝を曲げない）、腕は胸の前にたたむ。
+     宙返りの軸をカメラ側へ傾け、画面の中で「頭が横 → 下 → 斜め下 → 横 → 上」と回って見えるようにする（動画どおり）
+   ・コーク 1080・1440：体をほぼ横倒しにしたまま、抱え込んで体の軸まわりに回る（動画では頭が左、脚をたたんで横向き） */
+var FV_TILT_SIGN = -1, FV_LEAN_SIGN = -1;   // 画面の左右に合わせる符号（描いて確かめて決めた）
+var FV_LOOK = {
+  // flipTilt：宙返りの軸（真横）を画面の中で傾ける角度。逆さのとき頭が真下ではなく左下に来る（動画は約 35° 左）
+  // dwell：逆さの形を長く見せる（前からは、頭がこちら向き／向こう向きの間は短く、逆さの斜めが長く見える。動画どおり）
+  dblFull:  { layout: true, armsIn: true, flipTilt: 17.5, dwell: 1.8 },
+  // offAxis：体を横へ倒す最大の角度（＋で頭が画面の左）
+  cork1080: { offAxis: 80, tuckHold: true },
+  cork1440: { offAxis: 80, tuckHold: true }
+};
 function fvRotY(q, c, a){ var x = q.xg - c.xg, z = q.z - c.z; q.xg = c.xg + x * Math.cos(a) - z * Math.sin(a); q.z = c.z + x * Math.sin(a) + z * Math.cos(a); }
 function fvRotX(q, c, b){ var y = q.y - c.y, z = q.z - c.z; q.y = c.y + y * Math.cos(b) + z * Math.sin(b); q.z = c.z - y * Math.sin(b) + z * Math.cos(b); }
 function fvRotAxis(q, c, n, a){   // n：単位ベクトル（xg, y, z）まわりに a ラジアン（ロドリゲス）
@@ -5672,6 +5685,8 @@ function fvSkier(){
         spin = { trick: air.trick, yawTurns: fr * (sd.yaw || 0), flipTurns: fr * (sd.pitchTurns || 0) };
         spin.sideTurns = fr * (sd.flip || 0);                  // ★v8.6 ループ（横向きの宙返り。仮）
         if (FV_SPIN_TRICKS[air.trick] === 'cork') tuck = Math.sin(Math.PI * fr) * (1 - open);          // コークは途中で抱え込む
+        if (FV_LOOK[air.trick] && FV_LOOK[air.trick].tuckHold) tuck = Math.min(1, 1.8 * Math.sin(Math.PI * fr)) * (1 - open);   // ★v8.9 空中ではずっと抱え込む
+        spin.fr = fr; spin.open = open;
         gAmt = (air.bonusOn && air.bonusKind) ? clamp(air.grabT, 0, 1) * (1 - open) : 0; gKind = air.bonusKind;   // ★v8.7
       }
       else other = air.trick;
@@ -5695,6 +5710,8 @@ function fvSkier(){
   // 脚の長さ：伸びて 0.90 m、吸収で最大 0.48 m 縮む。MISS の突き上げで腰が上へ押される
   var L = 0.90 - 0.34 * Math.max(c, -0.35) - tk + 0.10 * buck;   // 吸収で最大 0.29 m 縮む（見本の動画の膝の曲がり方に合わせて浅くした）
   if (airH > 0.05) L = 0.90 - 0.08 * sp - 0.28 * ix - 0.50 * bs - 0.78 * kz - 0.45 * tuck;   // コザックは脚をほぼ水平に
+  var look = (spin && FV_LOOK[spin.trick]) || null;                  // ★v8.9
+  if (look && look.layout) L += (1.02 - L) * (1 - spin.open);        // レイアウト：膝を伸ばし切る（骨 0.48×2）
   var feetY = Math.max(fL.y, fR.y);
   var hip = { xg: hipX, y: feetY + L, z: zs - 0.06 - 0.10 * Math.max(c, 0) };
   // 上体：前へ少し倒す。吸収で少し深く、MISS で後ろへのけぞる
@@ -5726,6 +5743,11 @@ function fvSkier(){
     var fl = clamp(buck, 0, 1);
     hands = [ { xg: shL.xg - 0.12 - 0.25 * fl, y: sho.y - 0.40 + 0.50 * fl, z: sho.z + 0.42 - 0.25 * fl },
               { xg: shR.xg + 0.12 + 0.25 * fl, y: sho.y - 0.40 + 0.50 * fl, z: sho.z + 0.42 - 0.25 * fl } ];
+  }
+  if (look && look.armsIn && airH > 0.05) {   // ★v8.9 ひねるときは腕を胸の前にたたむ（動画どおり）
+    var ai = 1 - spin.open;
+    var inH = [ { xg: sho.xg - 0.09, y: sho.y - 0.20, z: sho.z + 0.17 }, { xg: sho.xg + 0.09, y: sho.y - 0.20, z: sho.z + 0.17 } ];
+    for (var ah = 0; ah < 2; ah++) hands[ah] = { xg: hands[ah].xg + (inH[ah].xg - hands[ah].xg) * ai, y: hands[ah].y + (inH[ah].y - hands[ah].y) * ai, z: hands[ah].z + (inH[ah].z - hands[ah].z) * ai };
   }
   var plant = (p.poleT > 0 && airH <= 0.05) ? clamp(p.poleT / 0.18, 0, 1) : 0;
   var pside = p.poleSide >= 0 ? 1 : 0;
@@ -5795,9 +5817,22 @@ function fvSkier(){
       // ★v8.6 ループ：コースの向き（z）を軸に横へ 1 回転【仮】
       pts.forEach(function(q){ fvRotAxis(q, ctr, [0, 0, 1], FV_SPIN_DIR.flip * 2 * Math.PI * spin.sideTurns); });
     }
+    else if (kindS === 'full' && look && look.flipTilt) {
+      // ★v8.9 ひねり（体の縦軸）→ 画面の中で少し傾けた横軸で宙返り。真横の軸のままだと逆さのとき頭が真下に来るが、動画では左下
+      var fb = FV_TILT_SIGN * look.flipTilt * Math.PI / 180, fn = [-Math.cos(fb), Math.sin(fb), 0];
+      var ft = spin.flipTurns, fk = ft - Math.floor(ft), fd = fk - 0.5;
+      if (look.dwell) fk = 0.5 + 0.5 * (fd < 0 ? -1 : 1) * Math.pow(Math.abs(2 * fd), look.dwell);   // 逆さ（半回転）の前後をゆっくり
+      ft = Math.floor(spin.flipTurns) + fk;
+      pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.twist * yawA); fvRotAxis(q, ctr, fn, FV_SPIN_DIR.flip * 2 * Math.PI * ft); });
+    }
     else if (kindS === 'full') {
       // ひねり（体の縦軸）→ 宙返り（横軸）の順に回す
       pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.twist * yawA); fvRotX(q, ctr, FV_SPIN_DIR.flip * 2 * Math.PI * spin.flipTurns); });
+    }
+    else if (look && look.offAxis) {
+      // ★v8.9 コーク 1080・1440：体の縦軸で回しながら、体ごと横へ倒す（踏切と着地の前は立てる）
+      var lean = look.offAxis * Math.PI / 180 * Math.pow(Math.sin(Math.PI * spin.fr), 0.55) * (1 - spin.open);
+      pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.yaw * yawA); fvRotAxis(q, ctr, [0, 0, 1], FV_LEAN_SIGN * lean); });
     } else {
       var tt = FV_SPIN_DIR.corkTilt * Math.PI / 180, n = [Math.sin(tt), Math.cos(tt), 0];
       pts.forEach(function(q){ fvRotAxis(q, ctr, n, FV_SPIN_DIR.yaw * yawA); });
