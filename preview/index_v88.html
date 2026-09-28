@@ -436,6 +436,16 @@
     letter-spacing:.18em;color:#c0392b;padding:0 6px;}
   body.replaying #replayTag::before{content:'';width:8px;height:8px;border-radius:50%;background:#c0392b;}
   body.replaying #btnReplayClose{display:inline-block;min-width:78px;}
+  /* ★v8.8 画面の中央より少し上に「REPLAY」（城さん）。押せない・触れても何も起きない。見本（sampling）では出さない */
+  /* 技名・PERFECT SET（#airInfo：上から 27%＋約 65px）の下に置く。背の低い画面でも重ならないように max() */
+  #replayBig{position:absolute;left:0;right:0;top:max(36%, calc(27% + 72px));z-index:3;display:none;text-align:center;pointer-events:none;}
+  body.replaying #replayBig{display:block;}
+  #replayBig{font-size:15px;font-weight:900;letter-spacing:.32em;color:#fff;}
+  #replayBig::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;vertical-align:1px;}
+  #replayBig{width:max-content;margin:0 auto;padding:7px 14px 7px 16px;border-radius:999px;background:rgba(192,57,43,.82);
+    box-shadow:0 2px 10px rgba(0,0,0,.18);}
+  #stage.narrow #replayBig{font-size:12px;padding:5px 11px 5px 13px;}
+  #stage.narrow #replayBig::before{width:7px;height:7px;margin-right:6px;}
   /* ★v8.3 視点の切り替え（リプレイの中だけ。§32.12）。再生中はキーのヒントを隠してボタンの場所を空ける */
   #btnReplayView{display:none;}
   body.replaying #btnReplayView{display:inline-block;min-width:96px;border-color:rgba(11,111,208,.45);color:#0b6fd0;}
@@ -497,6 +507,7 @@
   </div>
 
   <div class="hud" id="judgeText"></div>
+  <div id="replayBig">REPLAY</div>
 
   <div id="countdown" class="hidden"></div>
 
@@ -527,7 +538,7 @@
         <button id="btnRestart" type="button">RESTART</button>
         <button id="btnHome" type="button">HOME</button>
         <span id="replayTag">REPLAY</span>
-        <button id="btnReplayView" type="button">視点：いつもの</button>
+        <button id="btnReplayView" type="button">視点：テレビ</button>
         <button id="btnReplayClose" type="button">閉じる</button>
       </span>
     </div>
@@ -5352,7 +5363,7 @@ var REPLAY = {
   done: false,        // リザルトが出たら記録を閉じる
   active: false,      // 再生中
   realG: null, t0: 0, idx: -1, evIdx: 0, endAt: null, hudAcc: 0,
-  view: 'normal'      // ★v8.3 'normal' | 'frontA' | 'frontB'
+  view: 'frontA'      // ★v8.3 'normal' | 'frontA' | 'frontB'。★v8.8 最初はテレビ（城さん）。切りかえたらその視点を覚えておく
 };
 var REPLAY_MAX_FRAMES = 12000;   // 念のための上限（60 コマ/秒で 200 秒）
 
