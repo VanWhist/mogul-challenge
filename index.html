@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.6 -->
+<!-- MOGUL CHALLENGE v8.7 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -211,6 +211,22 @@
   #ptNotice{position:absolute;left:12px;right:12px;top:10px;z-index:7;text-align:center;font-size:13px;font-weight:900;
     color:#1b2a10;background:#ffd84a;border-radius:12px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:auto;}
   #ptNotice.hidden{display:none;}
+  /* ★v8.7 グラブ（§32.16）。選んでいる技のボタンの 2 行目に小さく出す。ボタンの高さ（38px）は変えない */
+  /* ★幅 0＋min-width:100% で、ボタンの幅を広げない（技の並び・折り返しを v8.6 と同じに保つ）。はみ出す分は左右均等に */
+  .gTag{display:flex;justify-content:center;width:0;min-width:100%;font-style:normal;font-size:7px;line-height:8px;
+    font-weight:900;letter-spacing:.04em;margin-top:1px;opacity:.9;white-space:nowrap;}
+  #grabPopBg{position:absolute;inset:0;z-index:8;}
+  #grabPop{position:absolute;z-index:9;width:224px;padding:8px;border-radius:12px;background:#12263b;
+    display:grid;grid-template-columns:1fr 1fr;gap:5px;box-sizing:border-box;
+    border:1px solid rgba(143,180,212,.55);box-shadow:0 8px 24px rgba(0,0,0,.45);color:#eaf3fb;text-align:center;}
+  #grabPop.hidden,#grabPopBg.hidden{display:none;}
+  #grabPop .gpHead{grid-column:1 / -1;font-size:9px;letter-spacing:.08em;color:#8fb4d4;margin-bottom:1px;white-space:nowrap;}
+  #grabPop .gItem{display:block;width:100%;min-height:38px;padding:3px 4px;appearance:none;border:1px solid rgba(143,180,212,.45);
+    background:transparent;color:#eaf3fb;font-size:10.5px;font-weight:800;letter-spacing:.04em;border-radius:999px;line-height:1.2;
+    cursor:pointer;font-family:inherit;white-space:nowrap;}
+  #grabPop .gItem.on{background:#2f9bff;border-color:#2f9bff;color:#fff;}
+  #grabPop .gItem.lock{opacity:.38;border-style:dashed;cursor:default;}
+  #grabPop .gItem i{display:block;font-style:normal;font-size:8px;letter-spacing:.04em;}
   body.sampling .hud,body.sampling #airInfo,body.sampling #countdown{visibility:hidden;}   /* 見本では字幕だけを見せる */
   /* リザルトの順位表（ツアーのときだけ出す） */
   #resTour{width:100%;margin-top:10px;}
@@ -613,6 +629,8 @@
 
   <!-- ★v8.6 新しい技が使えるようになった知らせ（重ねて 1 回・3 秒。§32.15） -->
   <div id="ptNotice" class="hidden"></div>
+  <div id="grabPopBg" class="hidden"></div>
+  <div id="grabPop" class="hidden"></div>
 
   <div id="tutSide"></div>
   <div id="tutBar">
@@ -1035,6 +1053,27 @@ var CONFIG = {
     { trick:'cork1080', pt:800  },
     { trick:'cork1440', pt:1500 }
   ],
+  /* ★v8.7 グラブを選べるようにする（§32.16。城さん確定 2026-09-28）
+     ・選べる技は grabTricks の 6 つ。BACK FULL・DOUBLE FULL は HOLD、SPREAD・IRON X は今のまま
+     ・グラブの種類で DD は変わらない（FIS の G は種類によらない）。効き方と値は技ごとの airBonusByTrick のまま
+     ・グラブもポイントで使えるようになる。MUTE・SAFETY も含む（0 pt ではグラブなし）
+     ・描き方（手の位置・抱え込み）は仮。城さんの確認待ち */
+  grabTricks: ['backScr', '360', 'cork720', 'cork1080', 'cork1440', 'loop'],
+  grabTypes: {
+    //          ski：+1 同じ側の板／−1 反対側の板。both：両手でそれぞれの板。dy：ブーツからの前後(px。+ がトップ)。tuck：抱え込みの量
+    mute:   { label:'MUTE',         tag:'MUTE',   ski:-1, dy:10,  tuck:0,    both:false },
+    safety: { label:'SAFETY',       tag:'SAFETY', ski: 1, dy:-8,  tuck:0,    both:false },
+    japan:  { label:'JAPAN',        tag:'JAPAN',  ski:-1, dy:2,   tuck:0.75, both:false },
+    tail:   { label:'TAIL',         tag:'TAIL',   ski: 1, dy:-12, tuck:0.45, both:false },
+    truck:  { label:'TRUCK DRIVER', tag:'TRUCK',  ski: 1, dy:26, tuck:0.80, both:true }   // ボタンの中は短く（幅を変えないため）
+  },
+  grabUnlocks: [
+    { grab:'mute',   pt:60   },
+    { grab:'safety', pt:100  },
+    { grab:'japan',  pt:250  },
+    { grab:'tail',   pt:600  },
+    { grab:'truck',  pt:1100 }
+  ],
   /* ★v8.6 技の種類（FIS の DD 表の分け方。城さん確定）。技の欄が 1 段（4 つ）に収まらないときだけ、種類のタブにする */
   trickCats: [
     { key:'straight', label:'ストレート',   tricks:['spread','backScr','ironX'] },
@@ -1113,7 +1152,9 @@ var CONFIG = {
   airSetMarkOn: true,
   grabCueOn:    true,
   selectedAir1: '360',      // 事前選択（§17.2）。滑走中は変更しない
-  selectedAir2: 'backFull', // v4.0 で '360'→'backFull'。既定のままでもリピートにならないように（§18.3）
+  selectedAir2: 'backFull',
+  selectedGrab1: 'mute',    // ★v8.7 AIR 1 のグラブ（使えないときは使えるグラブのうち解禁の早いもの）
+  selectedGrab2: 'mute', // v4.0 で '360'→'backFull'。既定のままでもリピートにならないように（§18.3）
 
   // 着地判定窓（ミリ秒。§17.4）。★この判定だけは時間基準。ターン判定の距離比率方式とは別物。
   // Cork 720 だけ狭くしないこと（Back Full と DD が同じなので選択が意味を失う）
@@ -1669,6 +1710,7 @@ function buildAir(zone, trickKey, index){
   var t    = CONFIG.airTricks[trickKey] || CONFIG.airTricks['360'];
   return {
     index: index, trick: trickKey, label: t.label,
+    grabKind: CONFIG.grabTricks.indexOf(trickKey) >= 0 ? grabKindFor(index) : null,   // ★v8.7
     ddBase: t.dd,        // ★技そのものの DD
     dd: t.dd,            // ★グラブが成立したら ddBase + CONFIG.grabDD に上がる（§17.7）
     code: t.code, upright: !!t.upright,
@@ -1973,10 +2015,26 @@ function finalizeAirSet(a){
    ★任意。押さなければ今まで通りの 1 タップのまま。
    ★窓は「飛行の進み u」で持つ。ms で持つと難易度でスピードが変わったときにずれる（§7.4）*/
 // その技の空中ボーナス（何も無い技は null）
-function airBonusOf(trickKey){
+/* ★v8.7 grabKind：選んだグラブ（'mute' など）。null ならグラブが使えない＝ボーナスなし。
+   省略したときは AIR 1 で選んでいるグラブ（チュートリアルの説明など）。
+   ★グラブを選べる技でも、DD の効き方と値は技ごとの表のまま。変えるのは kind と label だけ */
+var GRAB_BONUS_CACHE = {};
+function airBonusOf(trickKey, grabKind){
   if (!CONFIG.grabOn) return null;
-  return (CONFIG.airBonusByTrick && CONFIG.airBonusByTrick[trickKey]) || null;
+  var b = (CONFIG.airBonusByTrick && CONFIG.airBonusByTrick[trickKey]) || null;
+  if (!b || CONFIG.grabTricks.indexOf(trickKey) < 0) return b;
+  if (grabKind === undefined) grabKind = grabKindFor(1);
+  var gt = grabKind && CONFIG.grabTypes[grabKind];
+  if (!gt) return null;
+  var ck = trickKey + '/' + grabKind;
+  if (!GRAB_BONUS_CACHE[ck]) {
+    var o = {}; for (var k in b) o[k] = b[k];
+    o.kind = grabKind; o.label = gt.label;
+    GRAB_BONUS_CACHE[ck] = o;
+  }
+  return GRAB_BONUS_CACHE[ck];
 }
+function airBonusOfAir(a){ return a ? airBonusOf(a.trick, a.grabKind) : null; }
 /* 画面に出す言葉は必ず type から作る（★v7.2）。
    grab は掴む技なのでグラブ名を名乗らせ、hold は「形を保つ」なので GRAB とは出さない。
    ★ここを共通化しておかないと、合図・成立表示・リザルトのどれかに GRAB が残る */
@@ -1990,13 +2048,13 @@ function airBonusEffectText(b){
   return ' 評価点×' + CONFIG.grabQuality.toFixed(2);
 }
 function canGrab(a){
-  return !!a && !!airBonusOf(a.trick) && a.stage === 'flight' && a.result === null &&
+  return !!a && !!airBonusOfAir(a) && a.stage === 'flight' && a.result === null &&
          !a.bonusOn && !a.inputDone &&
          a.u >= CONFIG.grabFromU && a.u <= CONFIG.grabToU;
 }
 function resolveAirGrab(a){
   if (!canGrab(a)) return false;
-  var b = airBonusOf(a.trick);
+  var b = airBonusOfAir(a);
   a.bonusOn     = true;
   a.bonusU      = a.u;
   a.bonusType   = b.type;      // 'grab' | 'hold'
@@ -2506,6 +2564,7 @@ document.getElementById('btnResHome').addEventListener('click', goHome);
     });
   }
   // AIR 1 / AIR 2 の技を事前選択（§17.2）。滑走中は変更できない
+  for (var tk in CONFIG.airTricks) trickShortLabel(tk);   // ★v8.7 表記を先に控える
   var tb = document.querySelectorAll('.trickbtn');
   for (var t = 0; t < tb.length; t++) {
     tb[t].addEventListener('click', function(){
@@ -2515,6 +2574,7 @@ document.getElementById('btnResHome').addEventListener('click', goHome);
       TRICK_TAB.start[which] = trickCatOf(this.getAttribute('data-trick'));   // ★v8.6
       resetGame();
       showStartOverlay();
+      grabPopFor('start', which, this.getAttribute('data-trick'));   // ★v8.7
     });
   }
 })();
@@ -2574,7 +2634,8 @@ function tourEv(key){ var i = tourIdx(key); return i >= 0 ? CONFIG.tour[i] : nul
 function tourLoad(){
   // ★v8.1 tries＝完走した回数、clearTry＝初めて通過したのが何回目か（§32.10）。v:1 のまま足す（v8.0 の記録もそのまま読める）
   // ★v8.6 points＝ためたポイント、ptSeen＝知らせを出し終えた技の数（§32.15）
-  var db = { v: 1, cleared: [], best: {}, champion: false, tries: {}, clearTry: {}, points: 0, ptSeen: 0 };
+  // ★v8.7 gSeen＝知らせを出し終えたグラブの数（§32.16）
+  var db = { v: 1, cleared: [], best: {}, champion: false, tries: {}, clearTry: {}, points: 0, ptSeen: 0, gSeen: 0 };
   if (!recordsAvailable) return db;
   try {
     var raw = window.localStorage.getItem(CONFIG.tourStoreKey);
@@ -2588,6 +2649,7 @@ function tourLoad(){
         if (o.clearTry && typeof o.clearTry === 'object') db.clearTry = o.clearTry;
         if (typeof o.points === 'number' && isFinite(o.points) && o.points > 0) db.points = o.points;
         if (typeof o.ptSeen === 'number' && o.ptSeen > 0) db.ptSeen = o.ptSeen;
+        if (typeof o.gSeen === 'number' && o.gSeen > 0) db.gSeen = o.gSeen;
       }
     }
   } catch (e) { /* 壊れていたら既定値で続ける。消さない */ }
@@ -2694,6 +2756,36 @@ function ptUnlocked(db){
   for (var i = 0; i < CONFIG.pointUnlocks.length; i++) if (pts >= CONFIG.pointUnlocks[i].pt) out.push(CONFIG.pointUnlocks[i].trick);
   return out;
 }
+/* ★v8.7 ポイントで使えるようになったグラブ（解禁の順） */
+function grabUnlocked(db){
+  var pts = (db && db.points) || 0, out = [];
+  for (var i = 0; i < CONFIG.grabUnlocks.length; i++) if (pts >= CONFIG.grabUnlocks[i].pt) out.push(CONFIG.grabUnlocks[i].grab);
+  return out;
+}
+function grabPtOf(g){
+  for (var i = 0; i < CONFIG.grabUnlocks.length; i++) if (CONFIG.grabUnlocks[i].grab === g) return CONFIG.grabUnlocks[i].pt;
+  return 0;
+}
+/* AIR n で使うグラブ。選んだグラブが使えなければ、使えるグラブのうち解禁の早いもの。1 つも無ければ null（ボーナスなし）
+   ★GRAB_FORCE は起動時の不変条件の確認だけが使う（null＝グラブなしとして計算） */
+var GRAB_FORCE;
+function grabKindFor(slot){
+  if (GRAB_FORCE !== undefined) return GRAB_FORCE;
+  var un = grabUnlocked(tourLoad());
+  if (!un.length) return null;
+  var want = CONFIG['selectedGrab' + slot];
+  return un.indexOf(want) >= 0 ? want : un[0];
+}
+function isGrabTrick(t){ return CONFIG.grabTricks.indexOf(t) >= 0; }
+/* 技のボタンの中身。選んでいるグラブを持てる技だけ、2 行目にグラブ名を小さく出す（ボタンの高さは変えない） */
+function trickBtnInner(slot, t, on, extra){
+  var h = trickShortLabel(t) + (extra || '');
+  if (on && isGrabTrick(t)) {
+    var g = grabKindFor(slot);
+    if (g) h += '<i class="gTag"><span>' + CONFIG.grabTypes[g].tag + '</span></i>';   // グラブがまだ無いときは出さない（押すと一覧でロックが見える）
+  }
+  return h;
+}
 /* 並べる順（種類の順）にそろえる */
 function trickSort(list){
   return list.slice().sort(function(a, b){ return TRICK_ORDER.indexOf(a) - TRICK_ORDER.indexOf(b); });
@@ -2713,10 +2805,14 @@ function freeTricks(){
 function ptLine(db){
   if (!recordsAvailable) return 'TOUR';
   var pts = db.points || 0, s = 'TOUR ・ ' + pts + ' pt';
-  for (var i = 0; i < CONFIG.pointUnlocks.length; i++) {
-    if (pts < CONFIG.pointUnlocks[i].pt) return s + ' ・ 次の技まで あと ' + (CONFIG.pointUnlocks[i].pt - pts);
-  }
-  return s;
+  var nx = ptSchedule().filter(function(u){ return pts < u.pt; })[0];
+  return nx ? s + ' ・ あと ' + (nx.pt - pts) + ' で ' + nx.label : s;   // ★v8.7 次に使えるようになるもの（技・グラブ）の名前
+}
+/* ★v8.7 技とグラブを合わせた解禁の順 */
+function ptSchedule(){
+  var a = CONFIG.pointUnlocks.map(function(u){ return { pt: u.pt, label: CONFIG.airTricks[u.trick].label }; })
+    .concat(CONFIG.grabUnlocks.map(function(u){ return { pt: u.pt, label: CONFIG.grabTypes[u.grab].label }; }));
+  return a.sort(function(x, y){ return x.pt - y.pt; });
 }
 /* 技の欄：1 段（trickRowMax）に収まるときは今までどおり全部並べる。
    収まらないときだけ、ラベルの行に種類のタブを出し、選んだ種類の技だけを並べる（行の高さは変えない） */
@@ -2750,23 +2846,84 @@ function applyTrickTabs(ctx, slot, lbl, row, avail, selected){
 var PT_NOTICE_TIMER = null;
 function ptNoticeMaybe(){
   if (!recordsAvailable || SAMPLE.on || elTourOv.classList.contains('hidden')) return;
-  var db = tourLoad(), un = ptUnlocked(db);
-  if (un.length <= (db.ptSeen || 0)) return;
-  var fresh = un.slice(db.ptSeen || 0);
-  db.ptSeen = un.length;
+  var db = tourLoad(), un = ptUnlocked(db), gu = grabUnlocked(db);
+  if (un.length <= (db.ptSeen || 0) && gu.length <= (db.gSeen || 0)) return;
+  var fresh = un.slice(db.ptSeen || 0), gFresh = gu.slice(db.gSeen || 0);
+  db.ptSeen = un.length; db.gSeen = gu.length;
   tourSave(db);
   var el = document.getElementById('ptNotice');
-  el.textContent = '新しい技 ' + fresh.map(function(t){ return CONFIG.airTricks[t].label; }).join('・') + ' が使えるようになりました';
+  var tS = fresh.map(function(t){ return CONFIG.airTricks[t].label; }).join('・');
+  var gS = gFresh.map(function(g){ return CONFIG.grabTypes[g].label; }).join('・');
+  // ★v8.7 グラブも知らせる
+  el.textContent = (tS && gS) ? '新しい技 ' + tS + ' と グラブ ' + gS + ' が使えるようになりました'
+                 : tS ? '新しい技 ' + tS + ' が使えるようになりました'
+                 : '新しいグラブ ' + gS + ' が使えるようになりました';
   el.classList.remove('hidden');
   if (PT_NOTICE_TIMER) clearTimeout(PT_NOTICE_TIMER);
   PT_NOTICE_TIMER = setTimeout(function(){ el.classList.add('hidden'); }, 3000);
 }
 document.getElementById('ptNotice').addEventListener('click', function(){ this.classList.add('hidden'); });
 
+/* ★v8.7 グラブの一覧（§32.16）。グラブを持てる技を押したら、そのボタンのすぐ上（入らなければ下）に小さく開く。
+   使えないグラブは薄く出し、必要なポイントを書く。外を押すと閉じる。行は足さない（協賛枠の位置は変わらない） */
+var GRAB_POP = { ctx: null, slot: null };
+function grabPopClose(){
+  document.getElementById('grabPop').classList.add('hidden');
+  document.getElementById('grabPopBg').classList.add('hidden');
+  GRAB_POP.ctx = null;
+}
+function grabPopFor(ctx, slot, t){
+  if (!isGrabTrick(t) || !CONFIG.grabOn) { grabPopClose(); return; }
+  var ov = ctx === 'tour' ? elTourOv : elStartOv;
+  var b = ov.querySelector('.trickbtn[data-air="' + slot + '"][data-trick="' + t + '"]');
+  if (!b) { grabPopClose(); return; }
+  var un = grabUnlocked(tourLoad()), cur = grabKindFor(slot);
+  var h = '<div class="gpHead">AIR ' + slot + ' ' + trickShortLabel(t) + ' のグラブ</div>';
+  for (var i = 0; i < CONFIG.grabUnlocks.length; i++) {
+    var g = CONFIG.grabUnlocks[i].grab, ok = un.indexOf(g) >= 0;
+    h += '<button type="button" class="gItem' + (ok ? '' : ' lock') + (g === cur ? ' on' : '') + '" data-g="' + g + '"' +
+         (ok ? '' : ' disabled') + '>' + CONFIG.grabTypes[g].label +
+         (ok ? '' : '<i>LOCK ' + CONFIG.grabUnlocks[i].pt + 'pt</i>') + '</button>';
+  }
+  var pop = document.getElementById('grabPop');
+  pop.innerHTML = h;
+  pop.classList.remove('hidden');
+  document.getElementById('grabPopBg').classList.remove('hidden');
+  GRAB_POP.ctx = ctx; GRAB_POP.slot = slot;
+  // 置き場所：ボタンの上（下には START と協賛枠があるので、なるべくかぶせない）。上に入らなければ下。左右は画面の中に収める
+  var st = document.getElementById('stage').getBoundingClientRect(), br = b.getBoundingClientRect();
+  var pw = pop.offsetWidth, ph = pop.offsetHeight;
+  var x = br.left - st.left + br.width / 2 - pw / 2;
+  x = Math.max(6, Math.min(st.width - pw - 6, x));
+  var y = br.top - st.top - ph - 4;
+  if (y < 6) y = br.bottom - st.top + 4;
+  pop.style.left = Math.round(x) + 'px';
+  pop.style.top = Math.round(Math.max(6, y)) + 'px';
+}
+document.getElementById('grabPopBg').addEventListener('click', grabPopClose);
+document.getElementById('grabPop').addEventListener('click', function(e){
+  var b = e.target.closest('.gItem');
+  if (!b || b.disabled) return;
+  var ctx = GRAB_POP.ctx, slot = GRAB_POP.slot;
+  CONFIG['selectedGrab' + slot] = b.getAttribute('data-g');
+  grabPopClose();
+  resetGame();
+  if (ctx === 'tour') { renderTour(tourLoad()); elTourOv.classList.remove('hidden'); }
+  else showStartOverlay();
+});
+// 画面が動いたら閉じる（ボタンからずれるため）
+elTourOv.addEventListener('scroll', grabPopClose);
+elStartOv.addEventListener('scroll', grabPopClose);
+
 /* スタート画面の技ボタンと同じ表記を使う（二重に書かない） */
+var TRICK_SHORT;   // ★起動時（この行より前）にも呼ばれるので、ここでは値を入れない
 function trickShortLabel(t){
-  var b = document.querySelector('.trickbtn[data-air="1"][data-trick="' + t + '"]');
-  return b ? b.textContent : ((CONFIG.airTricks[t] || {}).label || t);
+  TRICK_SHORT = TRICK_SHORT || {};
+  if (TRICK_SHORT[t]) return TRICK_SHORT[t];
+  var b = document.querySelector('#startOverlay .trickbtn[data-air="1"][data-trick="' + t + '"]');
+  var s = b ? (b.getAttribute('data-lbl') || b.firstChild.nodeValue) : ((CONFIG.airTricks[t] || {}).label || t);
+  if (b && !b.getAttribute('data-lbl')) b.setAttribute('data-lbl', s);
+  return (TRICK_SHORT[t] = s);
 }
 
 function renderTour(db){
@@ -2812,7 +2969,7 @@ function renderTour(db){
       var isNew = prev && ev.tricks.indexOf(t) >= 0 && prev.tricks.indexOf(t) < 0;
       return '<button class="trickbtn' + ((CONFIG.airTricks[t] || {}).upright ? ' up' : '') +
              (sel[slot] === t ? ' on' : '') + '" type="button" data-air="' + slot + '" data-trick="' + t + '">' +
-             trickShortLabel(t) + (isNew ? '<i class="newTag">NEW</i>' : '') + '</button>';
+             trickBtnInner(slot, t, sel[slot] === t, isNew ? '<i class="newTag">NEW</i>' : '') + '</button>';
     }).join('');
   }
   for (var sl = 1; sl <= 2; sl++) {
@@ -2841,6 +2998,7 @@ function renderTour(db){
     resetGame();
     renderTour(tourLoad());
     elTourOv.classList.remove('hidden');
+    grabPopFor('tour', slot, t);   // ★v8.7 グラブを持てる技なら、グラブの一覧を開く
   }
   // ★v8.6 種類のタブ。押しても技は変わらない（並ぶ技だけが変わる）
   function onTab(e){
@@ -3177,7 +3335,7 @@ function currentMaxScore(){
      ★v7.1 技ごとに扱いが違う：DD で効く技だけ足す。
      Quality で効く技（バックフル）は Quality が 10.0 でクリップされるので上限は動かない。
      掴めない技（スプレッド）は当然足さない */
-  var g1 = airBonusOf(CONFIG.selectedAir1), g2 = airBonusOf(CONFIG.selectedAir2);
+  var g1 = airBonusOf(CONFIG.selectedAir1, grabKindFor(1)), g2 = airBonusOf(CONFIG.selectedAir2, grabKindFor(2));   // ★v8.7
   if (g1) { if (g1.effect === 'dd') dd1 += CONFIG.grabDD; else if (g1.effect === 'ddAbs') dd1 = g1.dd; }
   if (g2) { if (g2.effect === 'dd') dd2 += CONFIG.grabDD; else if (g2.effect === 'ddAbs') dd2 = g2.dd; }
   var ddSum  = repeat ? dd1 : dd1 + dd2;               // リピートは 2 本目がカウントされない（§18.3）
@@ -3195,7 +3353,7 @@ window.currentMaxScore = currentMaxScore;
 /* スタート画面に出す、その技のグラブの説明（★v7.1。§17.7）。
    技ごとに掴み方も効果も違うので、選んだ技に対して何が起きるかを滑る前に出す */
 function grabNoteOf(trickKey, n){
-  var g = airBonusOf(trickKey);
+  var g = airBonusOf(trickKey, grabKindFor(n));
   if (!g) return 'AIR ' + n + ' ボーナスなし';
   return 'AIR ' + n + ' ' + g.label + airBonusEffectText(g);
 }
@@ -3719,10 +3877,11 @@ function showStartOverlay(){
   if (freeAvail.indexOf(CONFIG.selectedAir1) < 0) CONFIG.selectedAir1 = '360';
   if (freeAvail.indexOf(CONFIG.selectedAir2) < 0) CONFIG.selectedAir2 = 'backFull';
   var sel = { '1': CONFIG.selectedAir1, '2': CONFIG.selectedAir2 };
-  var tb = document.querySelectorAll('.trickbtn');
+  var tb = document.querySelectorAll('#startOverlay .trickbtn');
   for (var t = 0; t < tb.length; t++) {
-    var ai = tb[t].getAttribute('data-air');
-    tb[t].classList.toggle('on', tb[t].getAttribute('data-trick') === sel[ai]);
+    var ai = tb[t].getAttribute('data-air'), tk = tb[t].getAttribute('data-trick'), isOn = tk === sel[ai];
+    tb[t].classList.toggle('on', isOn);
+    tb[t].innerHTML = trickBtnInner(ai, tk, isOn);   // ★v8.7 選んでいる技にグラブ名
   }
   for (var sl = 1; sl <= 2; sl++) {
     applyTrickTabs('start', String(sl), document.getElementById('startLbl' + sl),
@@ -4398,7 +4557,7 @@ function drawAirJump(cx, judgeY, a){
 function drawGrabCue(cx, judgeY, a){
   if (!a || !CONFIG.grabOn || !CONFIG.grabCueOn) return;
   if (!canGrab(a)) return;
-  var txt = airBonusCue(airBonusOf(a.trick));
+  var txt = airBonusCue(airBonusOfAir(a));
   if (!txt) return;
   var y = judgeY - 52;
   var k = 0.55 + 0.45 * Math.sin(G.time * 9);      // 点滅させて「今だ」と分かるようにする
@@ -4579,6 +4738,7 @@ function drawPlayer(cx, judgeY){
   var airKosak    = 0;   // コザック（★v7.3。ダブルの 2 つ目の技）
   var airGrabSki  = 1;   // ★v7.1 どちらの板を掴むか（+1 同じ側＝セーフティ／−1 反対側＝ミュート）
   var airGrabDy   = CONFIG.grabSafetyDy;   // ★v7.1 ブーツの前か後ろか
+  var airGrabBoth = false;                 // ★v8.7 両手（TRUCK DRIVER）
   var airSpreadPx = CONFIG.airArmSpread;   // 技ごとの腕の開き量（★v6.6）
   var pitchSy  = 1;      // 前後回転の縦の潰れ（負なら上下が入れ替わる＝逆さ）
   if (air) {
@@ -4675,8 +4835,12 @@ function drawPlayer(cx, judgeY){
     airKosak  = (air.bonusOn && air.bonusPose === 'kosak' ? air.grabT : 0) * (1 - open);
     if (airKosak > 0.001) airCross = airCross * (1 - airKosak);   // アイアンクロスを解く
     // ★v7.1 セーフティとミュートで掴む場所が違う（§17.7）
-    airGrabSki = (air.bonusKind === 'mute') ? -1 : 1;
-    airGrabDy  = (air.bonusKind === 'mute') ? CONFIG.grabMuteDy : CONFIG.grabSafetyDy;
+    // ★v8.7 種類ごとの掴む場所は CONFIG.grabTypes（仮。城さんの確認待ち）
+    var gType = CONFIG.grabTypes[air.bonusKind] || null;
+    airGrabSki  = gType ? gType.ski : 1;
+    airGrabDy   = gType ? gType.dy : CONFIG.grabSafetyDy;
+    airGrabBoth = !!(gType && gType.both);
+    if (gType && gType.tuck) airKnee = Math.max(airKnee, airGrab * gType.tuck);   // JAPAN・TAIL・TRUCK DRIVER は脚を抱え込む
     // ★v7.1 開いた腕を下ろすのは掴む側だけ。両腕とも下ろすと左右対称のままで、
     //   「片手で掴んでいる」ことが読めない（v7.0 のバックスクラッチャーがそうなっていた）
 
@@ -4857,7 +5021,7 @@ function drawPlayer(cx, judgeY){
     var tipY  = shoY + 33.0 + on * CONFIG.polePlantDrop;
     // ★v6.3: 空中では腕とストックを外へ開く（実写のコマ送りがそうなっている）
     // ★v7.1 掴む側（右腕）はグラブの進み具合だけ開きを戻す
-    var spreadK = airSpread * (ai === 1 ? (1 - airGrab) : 1) * (1 - airKosak);
+    var spreadK = airSpread * ((ai === 1 || airGrabBoth) ? (1 - airGrab) : 1) * (1 - airKosak);
     if (spreadK > 0.001) {
       var k = spreadK;
       handX += ai * airSpreadPx * k;
@@ -4878,14 +5042,15 @@ function drawPlayer(cx, judgeY){
        両手を下ろすと「抱え込み」に見えてしまい、グラブだと読めない。
        ★v7.1 セーフティ＝同じ側の板のブーツの後ろ／ミュート＝体をまたいで反対側の板の前。
          ミュートでは腕が体の前を横切るので、真後ろからでも「またいでいる」ことが読める */
-    if (airGrab > 0.001 && ai === 1) {
+    if (airGrab > 0.001 && (ai === 1 || airGrabBoth)) {
       var gk  = airGrab * CONFIG.grabReach;
+      var gSki = airGrabBoth ? ai : airGrabSki;   // ★v8.7 両手のときは、それぞれ自分の側の板
       // ★板の「外側の面」に手を置く。板の中心ちょうどだと脚に隠れて手が見えない
-      var gsx = footX + airGrabSki * (CONFIG.skiGap + skiOut + CONFIG.grabOutX);
+      var gsx = footX + gSki * (CONFIG.skiGap + skiOut + CONFIG.grabOutX);
       handX += (gsx - handX) * gk;
       handY += (footYd + airGrabDy - handY) * gk;
       // ストックは掴んだ手から下へ流す（握ったまま垂れる）
-      tipX  += (gsx + airGrabSki * 13 - tipX) * gk;
+      tipX  += (gsx + gSki * 13 - tipX) * gk;
       tipY  += (footYd + airGrabDy + 18 - tipY) * gk;
     }
     /* ★v7.3 コザック。両腕を前に出してつま先（板）を取りにいく。
@@ -5456,7 +5621,7 @@ function fvSkier(){
   var buck = clamp(p.buck, 0, 1.5);
   var air = activeAir(G.playerD), airH = 0, sp = 0, other = null, tk = 0;
   var ix = 0, kz = 0, bs = 0, safety = 0;
-  var spin = null, tuck = 0, mute = 0;   // ★段階2 ② 回る技   // ★段階2 ① アイアンクロス・コザック・バックスクラッチャー（SAFETY）の形の量 0〜1
+  var spin = null, tuck = 0, gAmt = 0, gKind = null;   // ★v8.7 グラブの量と種類   // ★段階2 ② 回る技   // ★段階2 ① アイアンクロス・コザック・バックスクラッチャー（SAFETY）の形の量 0〜1
   if (air) {
     if (air.stage === 'takeoff' && !(air.setResult && air.setResult !== 'none')) {
       tk = Math.min(1, clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1) / 0.5) * 0.45;
@@ -5475,20 +5640,21 @@ function fvSkier(){
       else if (air.trick === 'backScr') {
         // バックスクラッチャー：膝を前へ曲げ、板のテールを背中側へ跳ね上げる。SAFETY は手で板をつかむ
         bs = pk;
-        safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
+        gAmt = (air.bonusOn && air.bonusKind) ? clamp(air.grabT, 0, 1) * (1 - open) : 0; gKind = air.bonusKind;   // ★v8.7
       }
       else if (FV_SPIN_TRICKS[air.trick]) {
         var sd = AIR_SPIN[air.trick] || {}, mx = Math.max(sd.flip || 0, sd.yaw || 0, 1e-6);
         var fr = clamp(air.rot / mx, 0, 1);                    // 回転の進み 0〜1（タップした所で止まる。早すぎると回り足りずに着地）
         spin = { trick: air.trick, yawTurns: fr * (sd.yaw || 0), flipTurns: fr * (sd.pitchTurns || 0) };
         spin.sideTurns = fr * (sd.flip || 0);                  // ★v8.6 ループ（横向きの宙返り。仮）
-        safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;   // ★v8.6 ループの SAFETY
         if (FV_SPIN_TRICKS[air.trick] === 'cork') tuck = Math.sin(Math.PI * fr) * (1 - open);          // コークは途中で抱え込む
-        mute = (air.bonusOn && air.bonusKind === 'mute') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
+        gAmt = (air.bonusOn && air.bonusKind) ? clamp(air.grabT, 0, 1) * (1 - open) : 0; gKind = air.bonusKind;   // ★v8.7
       }
       else other = air.trick;
     }
   }
+  var gTy = gAmt > 0 ? CONFIG.grabTypes[gKind] : null;
+  if (gTy && gTy.tuck) tuck = Math.max(tuck, gAmt * gTy.tuck);   // ★v8.7 JAPAN・TAIL・TRUCK DRIVER は抱え込む
   if (airH > 0.05) { var rg = clamp(airH / 0.6, 0, 1); footX += (torX - footX) * rg; hipX += (torX - hipX) * rg; }
   var lean = clamp(p.lean, -1, 1);
   // 足の幅：見本の動画のように両脚をそろえる（v8.3）。MISS の突き上げでは少し開く
@@ -5544,11 +5710,17 @@ function fvSkier(){
     var hdn = [ { xg: hip.xg - 0.16, y: hip.y - 0.30, z: hip.z + 0.30 }, { xg: hip.xg + 0.16, y: hip.y - 0.22, z: hip.z + 0.34 } ];
     for (var kh = 0; kh < 2; kh++) hands[kh] = { xg: hands[kh].xg + (hdn[kh].xg - hands[kh].xg) * kz, y: hands[kh].y + (hdn[kh].y - hands[kh].y) * kz, z: hands[kh].z + (hdn[kh].z - hands[kh].z) * kz };
   }
-  if (mute > 0) {   // MUTE：左手で右の板の前をつかむ（抱え込んだ脚の前）
-    hands[0] = { xg: hands[0].xg + (fRa.xg - 0.05 - hands[0].xg) * mute, y: hands[0].y + (fRa.y + 0.10 - hands[0].y) * mute, z: hands[0].z + (fRa.z + 0.25 - hands[0].z) * mute };
-  }
-  if (safety > 0) {   // SAFETY：右手で右の板をつかむ
-    hands[1] = { xg: hands[1].xg + (fRa.xg + 0.12 - hands[1].xg) * safety, y: hands[1].y + (fRa.y + 0.05 - hands[1].y) * safety, z: hands[1].z + (fRa.z + 0.10 - hands[1].z) * safety };
+  // ★v8.7 グラブの手（z＋ がトップ側）。MUTE・SAFETY は v8.6 と同じ位置。JAPAN・TAIL・TRUCK DRIVER は仮
+  function grabHand(hi, to){ var h0 = hands[hi]; hands[hi] = { xg: h0.xg + (to.xg - h0.xg) * gAmt, y: h0.y + (to.y - h0.y) * gAmt, z: h0.z + (to.z - h0.z) * gAmt }; }
+  if (gTy) {
+    if (gKind === 'mute')   grabHand(0, { xg: fRa.xg - 0.05, y: fRa.y + 0.10, z: fRa.z + 0.25 });   // 左手で右の板の前
+    if (gKind === 'safety') grabHand(1, { xg: fRa.xg + 0.12, y: fRa.y + 0.05, z: fRa.z + 0.10 });   // 右手で右の板
+    if (gKind === 'japan')  grabHand(0, { xg: fRa.xg + 0.02, y: fRa.y + 0.16, z: fRa.z + 0.16 });   // 左手で右の板（抱え込んで引き寄せる）
+    if (gKind === 'tail')   grabHand(1, { xg: fRa.xg + 0.12, y: fRa.y + 0.10, z: fRa.z - 0.38 });   // 右手で右の板のテール
+    if (gKind === 'truck') {                                                                     // 両手でそれぞれの板のトップ
+      grabHand(0, { xg: fLa.xg - 0.06, y: fLa.y + 0.08, z: fLa.z + 0.42 });
+      grabHand(1, { xg: fRa.xg + 0.06, y: fRa.y + 0.08, z: fRa.z + 0.42 });
+    }
   }
   elbows = [ { xg: (shL.xg + hands[0].xg) / 2 - 0.10, y: (shL.y + hands[0].y) / 2 - 0.04, z: (shL.z + hands[0].z) / 2 - 0.02 },
              { xg: (shR.xg + hands[1].xg) / 2 + 0.10, y: (shR.y + hands[1].y) / 2 - 0.04, z: (shR.z + hands[1].z) / 2 - 0.02 } ];
@@ -6131,6 +6303,7 @@ if (!debugMode) {
     if (!(ev.passRank >= 1 && ev.passRank < ev.field)) issues.push(tag + ': 通過ラインが出場人数の外です');
     // 理論上の上限＝使える技の最良の組み合わせ。★1 位がこれ以上だと、その大会では絶対に優勝できない（§32.5）
     var best = 0;
+    GRAB_FORCE = null;   // ★v8.7 グラブなしで上限を出す（1 位がこれより下なら、グラブを持つ子はもっと届く）
     for (var x = 0; x < ev.tricks.length; x++) for (var y = 0; y < ev.tricks.length; y++) {
       CONFIG.selectedAir1 = ev.tricks[x]; CONFIG.selectedAir2 = ev.tricks[y];
       best = Math.max(best, currentMaxScore().total);
@@ -6141,6 +6314,7 @@ if (!debugMode) {
                '% / 1位 ' + top.toFixed(2) + ' < 上限 ' + best.toFixed(1));
   }
   CONFIG.selectedAir1 = keep.a1; CONFIG.selectedAir2 = keep.a2;
+  GRAB_FORCE = undefined;
   for (var k = 0; k < issues.length; k++) { invariantIssues.push(issues[k]); console.warn('[TOUR WARNING] ' + issues[k]); }
   if (!issues.length) console.log('[TOUR] 不変条件 OK : ' + lines.join(' / '));
   window.__tourCheck = { issues: issues, lines: lines };
