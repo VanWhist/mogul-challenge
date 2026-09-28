@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.9 -->
+<!-- MOGUL CHALLENGE v8.10 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -1074,6 +1074,12 @@ var CONFIG = {
   /* ★v8.8 ゴールしたら自動でリプレイを流す（城さん 2026-09-28）。見たくない人は「閉じる」でリザルトへ。
      リプレイが残らないラン（チュートリアルなど）では流さない。false で v8.7 までと同じ（リザルトの REPLAY ボタンだけ） */
   autoReplay: true,
+  /* ★v8.10 W杯はナイター（城さん 2026-09-28。実際の W杯の動画の会場に合わせる）。見た目だけ。判定・採点には関係しない
+     ・走っているとき（上から）：コースの外を暗く、雪面は照明の色。コースの片側に緑のフェンスと照明の列
+     ・リプレイ（テレビ・ジャッジ）：夜空、照明に照らされた雪、片側に緑のフェンスと照明の列、赤いボード */
+  nightWC: true,
+  nightTvZoom: 1,     // ナイターのテレビの視点の寄り（1＝いつもと同じ）。★r2 城さん「テレビはやっぱり寄り」で 0.45 → 1
+  nightTvAimX: 0,     // ナイターのテレビの視点で、狙いをフェンス側へずらす量(m)。★r2 で 0（寄りに戻した）
   grabTypes: {
     //          ski：+1 同じ側の板／−1 反対側の板。both：両手でそれぞれの板。dy：ブーツからの前後(px。+ がトップ)。tuck：抱え込みの量
     mute:   { label:'MUTE',         tag:'MUTE',   ski:-1, dy:10,  tuck:0,    both:false },
@@ -4282,11 +4288,12 @@ function render(){
     ctx.translate(G.shakeX * Math.sin(G.time * 62), G.shakeY * Math.sin(G.time * 47));
   }
 
-  // 背景
+  // 背景（★v8.10 W杯はナイター：コースの外は暗い）
+  var nightT = isNightVenue();
   var g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#cfe0f0');
-  g.addColorStop(0.55, '#eaf3fb');
-  g.addColorStop(1, '#f7fbff');
+  g.addColorStop(0,    nightT ? '#070a10' : '#cfe0f0');
+  g.addColorStop(0.55, nightT ? '#10151d' : '#eaf3fb');
+  g.addColorStop(1,    nightT ? '#171d27' : '#f7fbff');
   ctx.fillStyle = g;
   ctx.fillRect(-40, -40, W + 80, H + 80);
 
@@ -4299,19 +4306,19 @@ function render(){
   ctx.closePath();
   // 奥ほど冷たく沈ませる（§20.5）。一様な白だと斜面の奥行きが出ない
   var cg = ctx.createLinearGradient(0, 0, 0, H);
-  cg.addColorStop(0,    '#e6eef6');
-  cg.addColorStop(0.42, '#f7fbff');
-  cg.addColorStop(1,    '#ffffff');
+  cg.addColorStop(0,    nightT ? '#c9c8c6' : '#e6eef6');   // ナイター：照明の当たる雪（少し暖かい白。奥は暗め）
+  cg.addColorStop(0.42, nightT ? '#eeebe5' : '#f7fbff');
+  cg.addColorStop(1,    nightT ? '#faf8f3' : '#ffffff');
   ctx.fillStyle = cg;
   ctx.fill();
   // 左右の端を落として、平らな帯ではなく丸みのある斜面に見せる
   ctx.save();
   ctx.clip();
   var sg2 = ctx.createLinearGradient(cx - hwBot, 0, cx + hwBot, 0);
-  sg2.addColorStop(0,    'rgba(150,180,208,.30)');
-  sg2.addColorStop(0.24, 'rgba(150,180,208,0)');
-  sg2.addColorStop(0.76, 'rgba(150,180,208,0)');
-  sg2.addColorStop(1,    'rgba(150,180,208,.30)');
+  sg2.addColorStop(0,    nightT ? 'rgba(40,48,64,.38)' : 'rgba(150,180,208,.30)');
+  sg2.addColorStop(0.24, nightT ? 'rgba(40,48,64,0)'   : 'rgba(150,180,208,0)');
+  sg2.addColorStop(0.76, nightT ? 'rgba(40,48,64,0)'   : 'rgba(150,180,208,0)');
+  sg2.addColorStop(1,    nightT ? 'rgba(40,48,64,.38)' : 'rgba(150,180,208,.30)');
   ctx.fillStyle = sg2;
   ctx.fillRect(cx - hwBot, 0, hwBot * 2, H);
   ctx.restore();
@@ -4343,6 +4350,9 @@ function render(){
   ctx.moveTo(cx + hwTop, 0); ctx.lineTo(cx + hwBot, H);
   ctx.stroke();
   ctx.setLineDash([]);
+
+  // ★v8.10 ナイター：コースの左（選手から見て左）に緑のフェンスと照明の列。照明は 7 m ごと、コースと一緒に流れる
+  if (nightT) drawNightFence(cx, judgeY, hwTop, hwBot, H);
 
   // 判定窓の可視化（デバッグ用トグル）
   if (showWindows) {
@@ -4396,6 +4406,26 @@ function render(){
   ctx.globalAlpha = 1;
 
   drawPlayer(cx, judgeY);
+}
+
+/* ★v8.10 上から見たナイターのフェンスと照明。見た目だけ */
+function drawNightFence(cx, judgeY, hwTop, hwBot, H){
+  var off = 10;   // コースの端からフェンスまで(px、手前の縮尺)
+  var xAt = function(y){ var s = persp(y); return cx - (CONFIG.courseHalfWidth + off) * s; };
+  ctx.strokeStyle = '#1b6a45'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(xAt(0), 0); ctx.lineTo(xAt(H), H); ctx.stroke();
+  ctx.strokeStyle = 'rgba(80,190,130,.55)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(xAt(0) + 2, 0); ctx.lineTo(xAt(H) + 2, H); ctx.stroke();
+  var step = 7 * CONFIG.pxPerMeter;
+  var k0 = Math.ceil((G.playerD - (H - judgeY)) / step), k1 = Math.floor((G.playerD + judgeY) / step);
+  for (var k = k0; k <= k1; k++) {
+    var y = judgeY - (k * step - G.playerD), x = xAt(y), s = persp(y);
+    var gr = 14 * s;
+    var gl = ctx.createRadialGradient(x, y, 0, x, y, gr);
+    gl.addColorStop(0, 'rgba(255,248,222,.9)'); gl.addColorStop(0.4, 'rgba(255,244,210,.25)'); gl.addColorStop(1, 'rgba(255,244,210,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, gr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fffdf2'; ctx.beginPath(); ctx.arc(x, y, 2.4 * s, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 /* コントロールゲート：コース左右の境界に立つ旗竿（赤／青）。視覚表現のみ */
@@ -5868,12 +5898,25 @@ function fvMakeCam(mode, st){
   //   ほぼ一定（画面の高さの 2 割）に保って追う。見本の動画（MAH00536）に合わせた望遠の見え方【叩き台】
   var zT = zF + 25, C = { xg: -2.0, y: fvBase(zT) + 2.5, z: zT };
   var dx = -st.hip.xg - (-C.xg), dy = aim - C.y, dz = st.zs - C.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-  var F = clamp(0.20 * H * dist / 1.8, H * 1.2, H * 60);
-  var cam = fvCamera(C, { xg: st.hip.xg * 0.8, y: aim, z: st.zs }, F);
+  var nz = isNightVenue() ? CONFIG.nightTvZoom : 1, nax = isNightVenue() ? CONFIG.nightTvAimX : 0;   // ★v8.10
+  var F = clamp(0.20 * H * dist / 1.8 * nz, H * 1.2 * nz, H * 60);
+  var cam = fvCamera(C, { xg: st.hip.xg * 0.8 + nax, y: aim, z: st.zs }, F);
   cam.cy = H * 0.52;
   return cam;
 }
 /* ---- 雪面（高さの網を奥から手前へ塗る。陰影でコブの列を見せる） ---- */
+/* ★v8.10 ナイターの会場か（W杯のツアーのときだけ。リプレイ中も同じ） */
+function isNightVenue(){ return !!(CONFIG.nightWC && TOUR.applied && TOUR.key === 'wc'); }
+/* ナイターの雪面：影は青みのある暗い灰色、照明の当たる面は少し暖かい白（動画の雪の色） */
+var FV_SHADES_NIGHT = (function(){
+  var a = [];
+  for (var i = 0; i <= 47; i++) {
+    var t = Math.pow(i / 47, 0.85);
+    a.push('rgb(' + Math.round(48 + 204 * t) + ',' + Math.round(52 + 196 * t) + ',' + Math.round(64 + 176 * t) + ')');
+  }
+  return a;
+})();
+var FV_PAL = null;   // いま使っている雪面の色（renderFront の最初に決める）
 var FV_SHADES = (function(){
   var a = [];
   for (var i = 0; i <= 47; i++) {
@@ -5943,7 +5986,7 @@ function fvDrawStrip(cam, s){
   }
   for (var u = 0; u < used.length; u++) {
     lv = used[u]; var q = FV_GROUPS[lv];
-    ctx.fillStyle = FV_SHADES[lv];
+    ctx.fillStyle = (FV_PAL || FV_SHADES)[lv];
     ctx.beginPath();
     for (j = 0; j < q.length; j += 4) {
       ctx.moveTo(q[j].x, q[j].y); ctx.lineTo(q[j + 1].x, q[j + 1].y); ctx.lineTo(q[j + 2].x, q[j + 2].y); ctx.lineTo(q[j + 3].x, q[j + 3].y); ctx.closePath();
@@ -5983,6 +6026,51 @@ function fvDrawGate(cam, xg, z, col){
   var a = fvP(cam, xg, y + 1.55, z), b = fvP(cam, xg + (xg > 0 ? -0.62 : 0.62), y + 1.05, z);
   if (!a || !b) return;
   ctx.fillStyle = col; ctx.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+}
+/* ★v8.10 ナイターの会場（W杯）。フェンスはコースの片側（選手から見て左＝テレビの視点では右。動画どおり） */
+var FV_FENCE_X = null;
+function fvFenceX(){ return -(FV.courseHalf + 1.1); }
+function fvDrawFence(cam, z){
+  var x = FV_FENCE_X, z1 = z + 3, h = 1.15;
+  var a = fvP(cam, x, fvBase(z), z), b = fvP(cam, x, fvBase(z1), z1), c = fvP(cam, x, fvBase(z1) + h, z1), d = fvP(cam, x, fvBase(z) + h, z);
+  if (!a || !b || !c || !d) return;
+  ctx.fillStyle = '#17563a';
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#2f9163'; ctx.lineWidth = Math.max(1, 0.05 * (c.s + d.s) / 2);   // 上の縁（照明で明るい）
+  ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+}
+function fvDrawLamp(cam, z){
+  var x = FV_FENCE_X, y0 = fvBase(z), p = fvP(cam, x, y0 + 1.6, z), q = fvP(cam, x, y0 + 1.1, z);
+  if (!p || !q || p.x < -80 || p.x > view.W + 80) return;
+  fvLine(cam, { xg: x, y: y0 + 1.1, z: z }, { xg: x, y: y0 + 1.6, z: z }, 0.05, '#1c2430');
+  var r = Math.max(1.2, 0.11 * p.s), gr = Math.max(4, 0.9 * p.s);
+  var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+  g.addColorStop(0, 'rgba(255,250,228,.85)'); g.addColorStop(0.35, 'rgba(255,244,210,.28)'); g.addColorStop(1, 'rgba(255,244,210,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fffdf2'; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+}
+/* スタートの幕（動画の上の方に見える紺の看板と赤い板）。見た目だけ */
+function fvDrawStartWall(cam, z){
+  var y = fvBase(z), a = fvP(cam, 9, y + 1.9, z), b = fvP(cam, -9, y, z);
+  if (!a || !b) return;
+  var x0 = Math.min(a.x, b.x), w = Math.abs(b.x - a.x), y0 = Math.min(a.y, b.y), hh = Math.abs(b.y - a.y);
+  ctx.fillStyle = '#1b2330'; ctx.fillRect(x0, y0, w, hh);
+  ctx.fillStyle = 'rgba(210,225,240,.55)'; ctx.fillRect(x0, y0 + hh * 0.30, w, Math.max(1, hh * 0.10));   // 看板の文字の帯
+  var r1 = fvP(cam, -1.6, y + 1.5, z), r2 = fvP(cam, -2.6, y, z);                                          // 赤い板
+  if (r1 && r2) { ctx.fillStyle = '#d23a2e'; ctx.fillRect(Math.min(r1.x, r2.x), Math.min(r1.y, r2.y), Math.abs(r2.x - r1.x), Math.abs(r2.y - r1.y)); }
+}
+/* 赤いボード（動画のコース脇の赤い板。旗門の位置、フェンス側に立てる） */
+function fvDrawBoard(cam, z){
+  var x = FV_FENCE_X + 0.55, y = fvBase(z);
+  var a = fvP(cam, x - 0.45, y + 1.25, z), b = fvP(cam, x + 0.45, y, z);
+  if (!a || !b) return;
+  var x0 = Math.min(a.x, b.x), w = Math.abs(b.x - a.x), y0 = Math.min(a.y, b.y), hh = Math.abs(b.y - a.y);
+  ctx.fillStyle = '#d23a2e'; ctx.fillRect(x0, y0, w, hh);
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x0, y0 + hh * 0.86, w, hh * 0.14);
+  if (w > 6) {   // 白い紋（丸）
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = Math.max(0.8, w * 0.05);
+    ctx.beginPath(); ctx.arc(x0 + w / 2, y0 + hh * 0.52, w * 0.2, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 function fvDrawTree(cam, t){
   var y = fvBase(t.z), b = fvP(cam, t.x, y, t.z); if (!b) return;
@@ -6091,6 +6179,15 @@ function renderFront(){
   ctx.setTransform(view.scale * view.dpr, 0, 0, view.scale * view.dpr, 0, 0);
   var st = fvSkier(), cam = fvMakeCam(REPLAY.view, st);
   var zTop = -120, top = fvP(cam, 0, fvBase(zTop), zTop), yTop = top ? top.y : H * 0.3;
+  var night = isNightVenue();                            // ★v8.10
+  FV_FENCE_X = fvFenceX();
+  FV_PAL = night ? FV_SHADES_NIGHT : FV_SHADES;
+  if (night) {
+    // 夜空。山は描かない（照明の外は見えない）
+    var skyN = ctx.createLinearGradient(0, 0, 0, Math.max(40, yTop));
+    skyN.addColorStop(0, '#05070b'); skyN.addColorStop(1, '#161b24');
+    ctx.fillStyle = skyN; ctx.fillRect(-40, -40, W + 80, H + 80);
+  } else {
   // 空
   var sky = ctx.createLinearGradient(0, 0, 0, Math.max(40, yTop));
   sky.addColorStop(0, '#7fb0dc'); sky.addColorStop(1, '#d6e7f5');
@@ -6100,10 +6197,11 @@ function renderFront(){
   ctx.beginPath(); ctx.moveTo(-40, yTop + 2);
   for (var mx = -40; mx <= W + 40; mx += 20) ctx.lineTo(mx, yTop - 14 - 30 * Math.abs(Math.sin(mx * 0.019 + 1.3)) - 12 * Math.abs(Math.sin(mx * 0.061)));
   ctx.lineTo(W + 40, yTop + 2); ctx.closePath(); ctx.fill();
-  // 斜面（平面）。奥は霞ませる
-  ctx.fillStyle = FV_SHADES[fvShade(0, -FV.tan)]; ctx.fillRect(-40, yTop, W + 80, H + 80);
+  }
+  // 斜面（平面）。奥は霞ませる（ナイターは暗く沈ませる）
+  ctx.fillStyle = FV_PAL[fvShade(0, -FV.tan)]; ctx.fillRect(-40, yTop, W + 80, H + 80);
   var sg = ctx.createLinearGradient(0, yTop, 0, yTop + 60);
-  sg.addColorStop(0, 'rgba(190,210,230,.8)'); sg.addColorStop(1, 'rgba(190,210,230,0)');
+  sg.addColorStop(0, night ? 'rgba(22,26,34,.9)' : 'rgba(190,210,230,.8)'); sg.addColorStop(1, night ? 'rgba(22,26,34,0)' : 'rgba(190,210,230,0)');
   ctx.fillStyle = sg; ctx.fillRect(-40, yTop, W + 80, 60);
   var dOf = function(xg, y, z){ var vx = -xg - cam.x, vy = y - cam.y, vz = z - cam.z; return vx * cam.fx + vy * cam.fy + vz * cam.fz; };
   var zNear = cam.z - 1.0, zEnd = G.finishD / FV.ppm, k;
@@ -6123,7 +6221,7 @@ function renderFront(){
     var zm = (strips[k].near.z + strips[k].far.z) / 2, dm = dOf(0, fvBase(zm), zm);
     if (dm > 0.4) items.push({ d: dm, t: 0, o: strips[k] });
   }
-  for (k = 0; k < FV.trees.length; k++) {
+  for (k = 0; k < (night ? 0 : FV.trees.length); k++) {
     var t = FV.trees[k], dt2 = dOf(t.x, fvBase(t.z), t.z);
     if (dt2 > (REPLAY.view === 'frontA' ? 16 : 1) && dt2 < 500) items.push({ d: dt2, t: 1, o: t });   // 案A はカメラのすぐ横の木を描かない（画面をふさぐため）
   }
@@ -6131,6 +6229,18 @@ function renderFront(){
   for (var gi = 1; gi * gateStep < zEnd; gi++) {
     var gz = gi * gateStep, gd = dOf(0, fvBase(gz), gz);
     if (gd > 1) items.push({ d: gd, t: 2, o: { z: gz, col: (gi % 2 === 0) ? CONFIG.gateColorRed : CONFIG.gateColorBlue } });
+  }
+  if (night) {   // ★v8.10 フェンス（3 m ごとの板）と照明（7 m ごと）
+    for (var fz = -24; fz < zEnd + 18; fz += 3) {
+      var fdd = dOf(FV_FENCE_X, fvBase(fz + 1.5), fz + 1.5);
+      if (fdd > 0.5) items.push({ d: fdd, t: 6, o: { z: fz } });
+    }
+    var bz = -9, bdd = dOf(0, fvBase(bz) + 1, bz);
+    if (bdd > 0.5) items.push({ d: bdd, t: 8, o: { z: bz } });
+    for (var lz = -21; lz < zEnd + 18; lz += 7) {
+      var ldd = dOf(FV_FENCE_X, fvBase(lz) + 1.6, lz);
+      if (ldd > 0.5) items.push({ d: ldd - 0.01, t: 7, o: { z: lz } });
+    }
   }
   for (k = 0; k < G.airs.length; k++) if (G.airs[k]) {
     var az = G.airs[k].dLip / FV.ppm - 1.2, ad = dOf(0, fvBase(az), az);
@@ -6144,7 +6254,11 @@ function renderFront(){
     var it = items[k];
     if (it.t === 0) fvDrawStrip(cam, it.o);
     else if (it.t === 1) fvDrawTree(cam, it.o);
+    else if (it.t === 2 && night) fvDrawBoard(cam, it.o.z);
     else if (it.t === 2) { fvDrawGate(cam, -FV.courseHalf, it.o.z, it.o.col); fvDrawGate(cam, FV.courseHalf, it.o.z, it.o.col); }
+    else if (it.t === 6) fvDrawFence(cam, it.o.z);
+    else if (it.t === 7) fvDrawLamp(cam, it.o.z);
+    else if (it.t === 8) fvDrawStartWall(cam, it.o.z);
     else if (it.t === 3) fvDrawKicker(cam, it.o);
     else if (it.t === 4) fvDrawFinish(cam, st);
     else { fvDrawSpray(cam, st); fvDrawSkier(cam, st); /* ★v8.6 頭の高さの点線は出さない（城さん 2026-09-28） */ }
