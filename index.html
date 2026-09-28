@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.3 -->
+<!-- MOGUL CHALLENGE v8.4 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -57,6 +57,10 @@
   #counters .row{display:flex;flex-direction:column;align-items:flex-start;}
   #counters .k{letter-spacing:.06em;color:#41586d;font-size:8px;}
   #counters .v{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.1;}
+  /* ★v8.4 ツアーの B級・A級だけ 3 項目（表示だけ。判定・採点は G.counts をそのまま使う。§32.13） */
+  #counters .cmp{display:none;}
+  #counters.compact .full{display:none;}
+  #counters.compact .cmp{display:flex;}
   .k-perfect{color:#0f8a5f!important;}
   .k-good{color:#1667c8!important;}
   .k-ok{color:#7a6a1f!important;}
@@ -439,12 +443,16 @@
   </div>
 
   <div class="hud card" id="counters">
-    <div class="row"><span class="k k-perfect">PERFECT</span><span class="v" id="cPerfect">0</span></div>
-    <div class="row"><span class="k k-good">GOOD</span><span class="v" id="cGood">0</span></div>
-    <div class="row"><span class="k k-ok">OK</span><span class="v" id="cOk">0</span></div>
-    <div class="row"><span class="k k-miss">MISS</span><span class="v" id="cMiss">0</span></div>
-    <div class="row"><span class="k k-major">MAJOR</span><span class="v" id="cMajor">0</span></div>
-    <div class="row"><span class="k k-whiff">WHIFF</span><span class="v" id="cWhiff">0</span></div>
+    <div class="row full"><span class="k k-perfect">PERFECT</span><span class="v" id="cPerfect">0</span></div>
+    <div class="row full"><span class="k k-good">GOOD</span><span class="v" id="cGood">0</span></div>
+    <div class="row full"><span class="k k-ok">OK</span><span class="v" id="cOk">0</span></div>
+    <div class="row full"><span class="k k-miss">MISS</span><span class="v" id="cMiss">0</span></div>
+    <div class="row full"><span class="k k-major">MAJOR</span><span class="v" id="cMajor">0</span></div>
+    <div class="row full"><span class="k k-whiff">WHIFF</span><span class="v" id="cWhiff">0</span></div>
+    <!-- ★v8.4 3 項目（GOOD＝GOOD＋OK、MISS＝MISS＋MAJOR＋WHIFF）。ツアーの B級・A級だけ出す -->
+    <div class="row cmp"><span class="k k-perfect">PERFECT</span><span class="v" id="cPerfect3">0</span></div>
+    <div class="row cmp"><span class="k k-good">GOOD</span><span class="v" id="cGood3">0</span></div>
+    <div class="row cmp"><span class="k k-miss">MISS</span><span class="v" id="cMiss3">0</span></div>
   </div>
 
   <div class="hud" id="judgeText"></div>
@@ -1379,6 +1387,16 @@ var elCount = {
   majorMiss: document.getElementById('cMajor'),
   whiff:     document.getElementById('cWhiff')
 };
+var elCounters = document.getElementById('counters');
+var elCount3 = {
+  perfect: document.getElementById('cPerfect3'),
+  good:    document.getElementById('cGood3'),
+  miss:    document.getElementById('cMiss3')
+};
+/* ★v8.4 左上を 3 項目にするラン：ツアーの B級・A級で、チュートリアルではないとき（§32.13） */
+function hudCompactRun(){
+  return !TUT_STARTING && TOUR.applied && (TOUR.key === 'bkyu' || TOUR.key === 'akyu');
+}
 
 /* =========================================================================
    状態
@@ -1414,6 +1432,7 @@ function resetGame(){
     sectionCounts: course.sectionCounts,
     difficulty: CONFIG.difficulty, // このランの難易度（§7.4）。リザルトに出す
     counts: { perfect:0, good:0, ok:0, miss:0, majorMiss:0, whiff:0 },
+    hudCompact: hudCompactRun(),   // ★v8.4 左上の表示だけ（判定・採点は読まない）
     // --- STEP 2（§14〜§16）---
     balance: CONFIG.startBalance,  // 0〜100。乱れの唯一の蓄積量（§14.1）
     combo:   0,
@@ -4739,6 +4758,12 @@ function updateHud(){
     (clamp((G.speed - CONFIG.minSpeed) / (CONFIG.maxSpeed - CONFIG.minSpeed), 0, 1) * 100).toFixed(1) + '%';
 
   for (var key in elCount) elCount[key].textContent = G.counts[key];
+  // ★v8.4 3 項目は表示するときに足すだけ（G.counts は書きかえない）
+  var cc = G.counts;
+  elCounters.classList.toggle('compact', !!G.hudCompact);
+  elCount3.perfect.textContent = cc.perfect;
+  elCount3.good.textContent    = cc.good + cc.ok;
+  elCount3.miss.textContent    = cc.miss + cc.majorMiss + cc.whiff;
 
   // BALANCE（§14）／ COMBO（§16）
   var balRatio = clamp(G.balance / CONFIG.startBalance, 0, 1);
