@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.7 -->
+<!-- MOGUL CHALLENGE v8.8 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -436,6 +436,17 @@
     letter-spacing:.18em;color:#c0392b;padding:0 6px;}
   body.replaying #replayTag::before{content:'';width:8px;height:8px;border-radius:50%;background:#c0392b;}
   body.replaying #btnReplayClose{display:inline-block;min-width:78px;}
+  /* ★v8.8 画面の中央より少し上に「REPLAY」（城さん）。押せない・触れても何も起きない。見本（sampling）では出さない */
+  /* ★r4（城さん「もう少し上。テレビだと頭に重なる」）：上の HUD（BALANCE の枠の下 ≒ 112px）のすぐ下。
+     背の高い画面だけ少し下げる（上から 17%）。テレビの視点の頭よりいつも上になる */
+  #replayBig{position:absolute;left:0;right:0;top:max(120px, 17%);z-index:3;display:none;text-align:center;pointer-events:none;}
+  body.replaying #replayBig{display:block;}
+  #replayBig{font-size:15px;font-weight:900;letter-spacing:.32em;color:#fff;}
+  #replayBig::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;vertical-align:1px;}
+  #replayBig{width:max-content;margin:0 auto;padding:7px 14px 7px 16px;border-radius:999px;background:rgba(192,57,43,.82);
+    box-shadow:0 2px 10px rgba(0,0,0,.18);}
+  #stage.narrow #replayBig{font-size:12px;padding:5px 11px 5px 13px;}
+  #stage.narrow #replayBig::before{width:7px;height:7px;margin-right:6px;}
   /* ★v8.3 視点の切り替え（リプレイの中だけ。§32.12）。再生中はキーのヒントを隠してボタンの場所を空ける */
   #btnReplayView{display:none;}
   body.replaying #btnReplayView{display:inline-block;min-width:96px;border-color:rgba(11,111,208,.45);color:#0b6fd0;}
@@ -497,6 +508,7 @@
   </div>
 
   <div class="hud" id="judgeText"></div>
+  <div id="replayBig">REPLAY</div>
 
   <div id="countdown" class="hidden"></div>
 
@@ -527,7 +539,7 @@
         <button id="btnRestart" type="button">RESTART</button>
         <button id="btnHome" type="button">HOME</button>
         <span id="replayTag">REPLAY</span>
-        <button id="btnReplayView" type="button">視点：いつもの</button>
+        <button id="btnReplayView" type="button">視点：テレビ</button>
         <button id="btnReplayClose" type="button">閉じる</button>
       </span>
     </div>
@@ -1059,6 +1071,9 @@ var CONFIG = {
      ・グラブもポイントで使えるようになる。MUTE・SAFETY も含む（0 pt ではグラブなし）
      ・描き方（手の位置・抱え込み）は仮。城さんの確認待ち */
   grabTricks: ['backScr', '360', 'cork720', 'cork1080', 'cork1440', 'loop'],
+  /* ★v8.8 ゴールしたら自動でリプレイを流す（城さん 2026-09-28）。見たくない人は「閉じる」でリザルトへ。
+     リプレイが残らないラン（チュートリアルなど）では流さない。false で v8.7 までと同じ（リザルトの REPLAY ボタンだけ） */
+  autoReplay: true,
   grabTypes: {
     //          ski：+1 同じ側の板／−1 反対側の板。both：両手でそれぞれの板。dy：ブーツからの前後(px。+ がトップ)。tuck：抱え込みの量
     mute:   { label:'MUTE',         tag:'MUTE',   ski:-1, dy:10,  tuck:0,    both:false },
@@ -4056,7 +4071,14 @@ function showResult(){
     ' ＋ TIME ' + CONFIG.timeScoreMax + ' ＝ ' + CONFIG.totalScoreMax +
     '（この構成の上限は ' + mxNow.total.toFixed(1) + '）';
   renderResultMode(s);
-  replayOnResult();                                   // ★v8.2 記録を閉じ、REPLAY ボタンを出す（§32.11）                               // ★v8.0 ツアーなら順位表とボタン
+  replayOnResult();                                   // ★v8.2 記録を閉じ、REPLAY ボタンを出す（§32.11）
+  if (CONFIG.autoReplay && replayAvailable()) {        // ★v8.8 ゴールしたら自動でリプレイ（§32.17）。記録はもう残してある（finishRun）
+    elResultOv.classList.remove('hidden');
+    REPLAY.auto = true;
+    if (totalAnimId) { cancelAnimationFrame(totalAnimId); totalAnimId = null; }   // 数え上げはリプレイのあとに見せる
+    startReplay();
+    return;
+  }                               // ★v8.0 ツアーなら順位表とボタン
   elResultOv.classList.remove('hidden');
 }
 
@@ -5342,7 +5364,7 @@ var REPLAY = {
   done: false,        // リザルトが出たら記録を閉じる
   active: false,      // 再生中
   realG: null, t0: 0, idx: -1, evIdx: 0, endAt: null, hudAcc: 0,
-  view: 'normal'      // ★v8.3 'normal' | 'frontA' | 'frontB'
+  view: 'frontA'      // ★v8.3 'normal' | 'frontA' | 'frontB'。★v8.8 最初はテレビ（城さん）。切りかえたらその視点を覚えておく
 };
 var REPLAY_MAX_FRAMES = 12000;   // 念のための上限（60 コマ/秒で 200 秒）
 
@@ -5454,6 +5476,8 @@ function closeReplay(){
   showJudge(null);
   updateHud();
   elResultOv.classList.remove('hidden');               // ★showResult は呼ばない（点のカウントアップや記録をやり直さない）
+  // ★v8.8 自動のリプレイのあとは、ここで初めてリザルトを見るので、TOTAL の数え上げをここで見せる（記録には触れない）
+  if (REPLAY.auto) { REPLAY.auto = false; elResultOv.scrollTop = 0; if (G.score) countUpTotal(G.score.totalScore); }
 }
 document.getElementById('btnReplay').addEventListener('click', startReplay);
 document.getElementById('btnReplayClose').addEventListener('click', closeReplay);
