@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.3 試作4（前から見る視点・未反映。v8.2 がもと） -->
+<!-- MOGUL CHALLENGE v8.3 試作5（前から見る視点・未反映。v8.2 がもと） -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -5163,6 +5163,20 @@ function fvP(cam, xg, y, z){
 }
 
 /* ---- 選手の姿勢（記録から。描くだけ） ---- */
+/* ★段階2 ② 回る技の向きと軸（城さんの確認まで仮。ここだけ直せば全部変わる）
+   yaw：+1＝左回り（上から見て反時計回り）／flip：+1＝後ろ宙返り（頭が山側へ）／corkTilt：コークの軸を縦から倒す角度（度、＋＝選手の右へ）
+   twist：バックフルのひねりの向き（+1＝左） */
+var FV_SPIN_DIR = { yaw: 1, flip: 1, twist: 1, corkTilt: 30 };
+function fvRotY(q, c, a){ var x = q.xg - c.xg, z = q.z - c.z; q.xg = c.xg + x * Math.cos(a) - z * Math.sin(a); q.z = c.z + x * Math.sin(a) + z * Math.cos(a); }
+function fvRotX(q, c, b){ var y = q.y - c.y, z = q.z - c.z; q.y = c.y + y * Math.cos(b) + z * Math.sin(b); q.z = c.z - y * Math.sin(b) + z * Math.cos(b); }
+function fvRotAxis(q, c, n, a){   // n：単位ベクトル（xg, y, z）まわりに a ラジアン（ロドリゲス）
+  var v = [q.xg - c.xg, q.y - c.y, q.z - c.z], ca = Math.cos(a), sa = Math.sin(a);
+  var d = n[0] * v[0] + n[1] * v[1] + n[2] * v[2];
+  var cr = [n[1] * v[2] - n[2] * v[1], n[2] * v[0] - n[0] * v[2], n[0] * v[1] - n[1] * v[0]];
+  q.xg = c.xg + v[0] * ca + cr[0] * sa + n[0] * d * (1 - ca);
+  q.y  = c.y  + v[1] * ca + cr[1] * sa + n[1] * d * (1 - ca);
+  q.z  = c.z  + v[2] * ca + cr[2] * sa + n[2] * d * (1 - ca);
+}
 function fvSkier(){
   var ppm = FV.ppm, p = G.player, zs = G.playerD / ppm;
   var swing = p.x + p.sway;
@@ -5178,7 +5192,8 @@ function fvSkier(){
   var c = CONFIG.absorbEnabled ? clamp(p.comp * p.compQ, -0.45, 1.15) : 0;
   var buck = clamp(p.buck, 0, 1.5);
   var air = activeAir(G.playerD), airH = 0, sp = 0, other = null, tk = 0;
-  var ix = 0, kz = 0, bs = 0, safety = 0;   // ★段階2 ① アイアンクロス・コザック・バックスクラッチャー（SAFETY）の形の量 0〜1
+  var ix = 0, kz = 0, bs = 0, safety = 0;
+  var spin = null, tuck = 0, mute = 0;   // ★段階2 ② 回る技   // ★段階2 ① アイアンクロス・コザック・バックスクラッチャー（SAFETY）の形の量 0〜1
   if (air) {
     if (air.stage === 'takeoff' && !(air.setResult && air.setResult !== 'none')) {
       tk = Math.min(1, clamp((G.playerD - air.dTakeoff) / (air.dLip - air.dTakeoff), 0, 1) / 0.5) * 0.45;
@@ -5199,25 +5214,32 @@ function fvSkier(){
         bs = pk;
         safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
       }
+      else if (air.trick === '360' || air.trick === 'backFull' || air.trick === 'cork720') {
+        var sd = AIR_SPIN[air.trick] || {}, mx = Math.max(sd.flip || 0, sd.yaw || 0, 1e-6);
+        var fr = clamp(air.rot / mx, 0, 1);                    // 回転の進み 0〜1（タップした所で止まる。早すぎると回り足りずに着地）
+        spin = { trick: air.trick, yawTurns: fr * (sd.yaw || 0), flipTurns: fr * (sd.pitchTurns || 0) };
+        if (air.trick === 'cork720') tuck = Math.sin(Math.PI * fr) * (1 - open);          // コークは途中で抱え込む
+        mute = (air.bonusOn && air.bonusKind === 'mute') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
+      }
       else other = air.trick;
     }
   }
   if (airH > 0.05) { var rg = clamp(airH / 0.6, 0, 1); footX += (torX - footX) * rg; hipX += (torX - hipX) * rg; }
   var lean = clamp(p.lean, -1, 1);
   // 足の幅：見本の動画のように両脚をそろえる（試作4）。MISS の突き上げでは少し開く
-  var feetSep = 0.09 + 0.5 * sp + 0.12 * ix + 0.78 * kz + 0.10 * clamp(buck, 0, 1);
+  var feetSep = 0.09 + 0.5 * sp + 0.12 * ix + 0.85 * kz + 0.10 * clamp(buck, 0, 1);
   var fz = zs + 0.22 * ix - 0.55 * bs;                 // アイアンクロスは足を前へ、バックスクラッチャーは後ろへ
   var fL = { xg: footX - feetSep, z: fz }, fR = { xg: footX + feetSep, z: fz };
   var gL = fvGround(fL.xg, zs), gR = fvGround(fR.xg, zs);
   if (airH > 0.05) {
     var gb = fvBase(zs); gL = gR = gb + airH;
-    var lift = 0.12 * sp + 0.22 * ix + 0.50 * kz + 0.62 * bs;
+    var lift = 0.12 * sp + 0.22 * ix + 0.50 * kz + 0.62 * bs + 0.30 * tuck;
     fL.y = gL + lift; fR.y = gR + lift;
   }
   else { fL.y = gL; fR.y = gR; }
   // 脚の長さ：伸びて 0.90 m、吸収で最大 0.48 m 縮む。MISS の突き上げで腰が上へ押される
   var L = 0.90 - 0.34 * Math.max(c, -0.35) - tk + 0.10 * buck;   // 吸収で最大 0.29 m 縮む（見本の動画の膝の曲がり方に合わせて浅くした）
-  if (airH > 0.05) L = 0.90 - 0.08 * sp - 0.28 * ix - 0.50 * bs - 0.45 * kz;
+  if (airH > 0.05) L = 0.90 - 0.08 * sp - 0.28 * ix - 0.50 * bs - 0.78 * kz - 0.45 * tuck;   // コザックは脚をほぼ水平に
   var feetY = Math.max(fL.y, fR.y);
   var hip = { xg: hipX, y: feetY + L, z: zs - 0.06 - 0.10 * Math.max(c, 0) };
   // 上体：前へ少し倒す。吸収で少し深く、MISS で後ろへのけぞる
@@ -5253,9 +5275,12 @@ function fvSkier(){
   var plant = (p.poleT > 0 && airH <= 0.05) ? clamp(p.poleT / 0.18, 0, 1) : 0;
   var pside = p.poleSide >= 0 ? 1 : 0;
   if (plant > 0) { var hh = hands[pside]; hh.y -= 0.10 * plant; hh.z += 0.18 * plant; hh.xg += (pside ? 0.06 : -0.06) * plant; }
-  if (kz > 0) {   // コザック：両手をつま先の方へ
-    hands[0] = { xg: hands[0].xg + (fLa.xg - 0.1 - hands[0].xg) * 0.7 * kz, y: hands[0].y + (fLa.y + 0.15 - hands[0].y) * 0.7 * kz, z: hands[0].z + (fLa.z + 0.2 - hands[0].z) * 0.7 * kz };
-    hands[1] = { xg: hands[1].xg + (fRa.xg + 0.1 - hands[1].xg) * 0.7 * kz, y: hands[1].y + (fRa.y + 0.15 - hands[1].y) * 0.7 * kz, z: hands[1].z + (fRa.z + 0.2 - hands[1].z) * 0.7 * kz };
+  if (kz > 0) {   // コザック：両手は下（開いた脚の間、腰の前）。城さん指摘 2026-09-28（写真：手は下）
+    var hdn = [ { xg: hip.xg - 0.16, y: hip.y - 0.30, z: hip.z + 0.30 }, { xg: hip.xg + 0.16, y: hip.y - 0.22, z: hip.z + 0.34 } ];
+    for (var kh = 0; kh < 2; kh++) hands[kh] = { xg: hands[kh].xg + (hdn[kh].xg - hands[kh].xg) * kz, y: hands[kh].y + (hdn[kh].y - hands[kh].y) * kz, z: hands[kh].z + (hdn[kh].z - hands[kh].z) * kz };
+  }
+  if (mute > 0) {   // MUTE：左手で右の板の前をつかむ（抱え込んだ脚の前）
+    hands[0] = { xg: hands[0].xg + (fRa.xg - 0.05 - hands[0].xg) * mute, y: hands[0].y + (fRa.y + 0.10 - hands[0].y) * mute, z: hands[0].z + (fRa.z + 0.25 - hands[0].z) * mute };
   }
   if (safety > 0) {   // SAFETY：右手で右の板をつかむ
     hands[1] = { xg: hands[1].xg + (fRa.xg + 0.12 - hands[1].xg) * safety, y: hands[1].y + (fRa.y + 0.05 - hands[1].y) * safety, z: hands[1].z + (fRa.z + 0.10 - hands[1].z) * safety };
@@ -5275,7 +5300,8 @@ function fvSkier(){
   if (airH > 0.05) hd0 = 0;
   // スプレッドは V、アイアンクロスは × に交差（左の板の先が右へ）
   var heads = [hd0 - 0.30 * sp + 0.75 * ix, hd0 + 0.30 * sp - 0.75 * ix];
-  var skiPitch = 1.25 * bs - 0.35 * kz;   // ＋＝板先が下（バックスクラッチャー）、−＝板先が上（コザック）   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
+  var skiPitch = 1.25 * bs - 1.15 * kz;
+  if (kz > 0) { heads[0] -= 0.35 * kz; heads[1] += 0.35 * kz; }   // コザック：板先を上に向けて V に開く   // ＋＝板先が下（バックスクラッチャー）、−＝板先が上（コザック）   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
   [fL, fR].forEach(function(f, idx){
     var a = heads[idx], sx = Math.sin(a), cz = Math.cos(a);
     var tipZ = f.z + cz * 0.88, tailZ = f.z - cz * 0.80, tipX = f.xg + sx * 0.88, tailX = f.xg - sx * 0.80;
@@ -5291,6 +5317,28 @@ function fvSkier(){
   var st = { zs: zs, hip: hip, sho: sho, head: head, shL: shL, shR: shR, hpL: hpL, hpR: hpR, knL: knL, knR: knR,
              fL: fLa, fR: fRa, hands: hands, elbows: elbows, poles: poles, skis: skis, airH: airH, other: other,
              shadowX: footX, groundY: (airH > 0.05 ? fvBase(zs) : Math.min(gL, gR)) };
+  // ★段階2 ② 回る技：体全体（板・ストックを含む）を体の中心まわりに回す。向きと軸は FV_SPIN_DIR（仮）
+  st.facing = 1;
+  if (spin) {
+    var ctr = { xg: hip.xg, y: hip.y + 0.25, z: hip.z };
+    var pts = [hip, sho, head, shL, shR, hpL, hpR, knL, knR, fLa, fRa].concat(hands, elbows);
+    poles.forEach(function(pp){ pts.push(pp[1]); });
+    skis.forEach(function(s){ pts.push(s.tip, s.tail); });
+    var fwd = { xg: hip.xg, y: hip.y, z: hip.z + 1 };    // 体の正面の向き（顔が向く側）を追う
+    var upv = { xg: hip.xg, y: hip.y + 1, z: hip.z };
+    pts.push(fwd, upv);
+    var yawA = 2 * Math.PI * spin.yawTurns;
+    if (spin.trick === '360') pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.yaw * yawA); });
+    else if (spin.trick === 'backFull') {
+      // ひねり（体の縦軸）→ 宙返り（横軸）の順に回す
+      pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.twist * yawA); fvRotX(q, ctr, FV_SPIN_DIR.flip * 2 * Math.PI * spin.flipTurns); });
+    } else {
+      var tt = FV_SPIN_DIR.corkTilt * Math.PI / 180, n = [Math.sin(tt), Math.cos(tt), 0];
+      pts.forEach(function(q){ fvRotAxis(q, ctr, n, FV_SPIN_DIR.yaw * yawA); });
+    }
+    st.facing = (fwd.z - hip.z) >= 0 ? 1 : -1;            // −1＝背中がカメラ側
+    st.upright = upv.y - hip.y;
+  }
   // 転倒：足元を軸に横へ倒す（描くだけ）
   if (G.fallAnim > 0.02) {
     var ang = G.fallAnim * 1.25 * (G.fallDir || 1), ca = Math.cos(ang), sa = Math.sin(ang);
@@ -5473,7 +5521,14 @@ function fvDrawSkier(cam, st){
     ctx.beginPath(); ctx.ellipse(sh.x, sh.y, 0.5 * sh.s * k, 0.16 * sh.s * k, 0, 0, Math.PI * 2); ctx.fill();
   }
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  var back = st.facing < 0;   // 回る技で背中がカメラ側：腕は体の向こう側になるので先に描き、ゴーグルは描かない
+  var drawArms = function(){
+    [[st.shL, st.elbows[0], st.hands[0]], [st.shR, st.elbows[1], st.hands[1]]].forEach(function(l){
+      fvLine(cam, l[0], l[1], 0.10, JACKET); fvLine(cam, l[1], l[2], 0.085, JACKET); fvDot(cam, l[2], 0.06, '#111820');
+    });
+  };
   st.poles.forEach(function(pp){ fvLine(cam, pp[0], pp[1], 0.025, '#6d7784'); });
+  if (back) drawArms();
   st.skis.forEach(function(s){ fvLine(cam, s.tail, s.tip, 0.10, SKI); fvDot(cam, s.tip, 0.055, '#e9f1fb'); });
   // 脚：すね → もも。膝に色（モーグルのウェアと同じ。ジャッジが見る膝の曲げ伸ばしを読みやすくする）
   [[st.hpL, st.knL, st.fL], [st.hpR, st.knR, st.fR]].forEach(function(l){
@@ -5496,14 +5551,12 @@ function fvDrawSkier(cam, st){
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, 0.04 * c.s);
     ctx.beginPath(); ctx.moveTo(d.x, d.y + 0.06 * d.s); ctx.lineTo(c.x, c.y + 0.06 * c.s); ctx.stroke();
   }
-  [[st.shL, st.elbows[0], st.hands[0]], [st.shR, st.elbows[1], st.hands[1]]].forEach(function(l){
-    fvLine(cam, l[0], l[1], 0.10, JACKET); fvLine(cam, l[1], l[2], 0.085, JACKET); fvDot(cam, l[2], 0.06, '#111820');
-  });
+  if (!back) drawArms();
   var h = fvP(cam, st.head.xg, st.head.y, st.head.z);
   if (h) {
     var r = Math.max(2, 0.13 * h.s);
     ctx.fillStyle = '#f4f6f8'; ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#233447'; ctx.fillRect(h.x - r * 0.85, h.y - r * 0.05, r * 1.7, r * 0.5);
+    if (!back) { ctx.fillStyle = '#233447'; ctx.fillRect(h.x - r * 0.85, h.y - r * 0.05, r * 1.7, r * 0.5); }
   }
 }
 /* 案A だけ：頭の高さの目安線。吸収がコブに合っていれば頭がこの線に沿って動き、ずれると上下する */
