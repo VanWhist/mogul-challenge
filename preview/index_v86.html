@@ -1089,9 +1089,9 @@ var CONFIG = {
     '360':    { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
     cork720:  { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
     backFull: { type:'hold', kind:null,     label:'HOLD',   effect:'quality' },
-    // ★v8.6 新しい技のグラブは FIS 表の組み合わせの行の値そのもの（ddAbs）。表に行が無いダブルフルはボーナスなし
-    loop:     { type:'grab', kind:'mute',   label:'MUTE',   effect:'ddAbs', dd:0.82 },   // Loop Grab lG
-    dblFull:  null,
+    // ★v8.6 新しい技のグラブは FIS 表の組み合わせの行の値そのもの（ddAbs）。ダブルフルはバックフルと同じホールド（評価点×1.08）
+    loop:     { type:'grab', kind:'safety', label:'SAFETY', effect:'ddAbs', dd:0.82 },   // Loop Grab lG（城さん：セーフティグラブ）
+    dblFull:  { type:'hold', kind:null,     label:'HOLD',   effect:'quality' },           // 城さん：バックフルと同じホールド（DD は動かさない）
     cork1080: { type:'grab', kind:'mute',   label:'MUTE',   effect:'ddAbs', dd:1.20 },   // 10oG
     cork1440: { type:'grab', kind:'mute',   label:'MUTE',   effect:'ddAbs', dd:1.39 }    // 14oG
   },
@@ -5470,6 +5470,7 @@ function fvSkier(){
         var fr = clamp(air.rot / mx, 0, 1);                    // 回転の進み 0〜1（タップした所で止まる。早すぎると回り足りずに着地）
         spin = { trick: air.trick, yawTurns: fr * (sd.yaw || 0), flipTurns: fr * (sd.pitchTurns || 0) };
         spin.sideTurns = fr * (sd.flip || 0);                  // ★v8.6 ループ（横向きの宙返り。仮）
+        safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;   // ★v8.6 ループの SAFETY
         if (FV_SPIN_TRICKS[air.trick] === 'cork') tuck = Math.sin(Math.PI * fr) * (1 - open);          // コークは途中で抱え込む
         mute = (air.bonusOn && air.bonusKind === 'mute') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
       }
@@ -5903,14 +5904,9 @@ function renderFront(){
     else if (it.t === 2) { fvDrawGate(cam, -FV.courseHalf, it.o.z, it.o.col); fvDrawGate(cam, FV.courseHalf, it.o.z, it.o.col); }
     else if (it.t === 3) fvDrawKicker(cam, it.o);
     else if (it.t === 4) fvDrawFinish(cam, st);
-    else { fvDrawSpray(cam, st); fvDrawSkier(cam, st); if (REPLAY.view === 'frontA' && !REPLAY.sample) fvDrawHeadGuide(cam, st); }
+    else { fvDrawSpray(cam, st); fvDrawSkier(cam, st); /* ★v8.6 頭の高さの点線は出さない（城さん 2026-09-28） */ }
   }
-  // 案B で選手が小さいときは輪で示す
-  var hp = fvP(cam, st.hip.xg, st.hip.y, st.zs);
-  if (hp && hp.s * 1.8 < 40) {
-    ctx.strokeStyle = 'rgba(216,65,47,.85)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(hp.x, hp.y - 0.2 * hp.s, 18, 0, Math.PI * 2); ctx.stroke();
-  }
+  // ★v8.6 選手を囲む赤い輪は出さない（城さん 2026-09-28）
 }
 function replaySetView(v){
   REPLAY.view = v;
