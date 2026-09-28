@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.5 -->
+<!-- MOGUL CHALLENGE v8.6 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -200,6 +200,17 @@
     font-size:17px;font-weight:900;line-height:1.45;color:#fff;background:rgba(8,20,34,.74);
     padding:10px 12px;border-radius:12px;letter-spacing:.04em;}
   #sampleCap span{display:inline-block;white-space:nowrap;}
+  /* ★v8.6 技の種類のタブ（§32.15）。ラベルの行の中に置き、行の高さを変えない（枠線を付けない） */
+  .diffLbl.tabs{white-space:nowrap;}
+  /* ★v8.6 「TOUR」の行にポイントを出す。日本語が混ざっても行の高さを今と同じ 11px に保つ（協賛枠を動かさない） */
+  #tourSub{flex:none;height:11px;line-height:11px;white-space:nowrap;overflow:hidden;letter-spacing:.06em;}
+  .trickTab{position:relative;display:inline-block;padding:0 3px;letter-spacing:.02em;color:#8fb4d4;cursor:pointer;}
+  .trickTab::before{content:'';position:absolute;left:-2px;right:-2px;top:-9px;bottom:-7px;}   /* 押せる範囲だけ広げる */
+  .trickTab.has{color:#bfe3ff;}
+  .trickTab.on{color:#fff;font-weight:900;text-decoration:underline;text-underline-offset:3px;}
+  #ptNotice{position:absolute;left:12px;right:12px;top:10px;z-index:7;text-align:center;font-size:13px;font-weight:900;
+    color:#1b2a10;background:#ffd84a;border-radius:12px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:auto;}
+  #ptNotice.hidden{display:none;}
   body.sampling .hud,body.sampling #airInfo,body.sampling #countdown{visibility:hidden;}   /* 見本では字幕だけを見せる */
   /* リザルトの順位表（ツアーのときだけ出す） */
   #resTour{width:100%;margin-top:10px;}
@@ -517,7 +528,7 @@
       <button class="diffbtn" type="button" data-diff="veryHard">超級</button>
     </div>
     <div class="diffNote" id="diffNote"></div>
-    <div class="diffLbl">AIR 1 の技</div>
+    <div class="diffLbl" id="startLbl1">AIR 1 の技</div>
     <div class="trickRow" data-air="1">
       <button class="trickbtn up" type="button" data-air="1" data-trick="spread">SPREAD</button>
       <button class="trickbtn up" type="button" data-air="1" data-trick="backScr">BACK SCR</button>
@@ -525,8 +536,12 @@
       <button class="trickbtn" type="button" data-air="1" data-trick="360">360</button>
       <button class="trickbtn" type="button" data-air="1" data-trick="backFull">BACK FULL</button>
       <button class="trickbtn" type="button" data-air="1" data-trick="cork720">CORK 720</button>
+      <button class="trickbtn" type="button" data-air="1" data-trick="cork1080">CORK 1080</button>
+      <button class="trickbtn" type="button" data-air="1" data-trick="cork1440">CORK 1440</button>
+      <button class="trickbtn" type="button" data-air="1" data-trick="dblFull">DBL FULL</button>
+      <button class="trickbtn" type="button" data-air="1" data-trick="loop">LOOP</button>
     </div>
-    <div class="diffLbl" style="margin-top:7px">AIR 2 の技</div>
+    <div class="diffLbl" id="startLbl2" style="margin-top:7px">AIR 2 の技</div>
     <div class="trickRow" data-air="2">
       <button class="trickbtn up" type="button" data-air="2" data-trick="spread">SPREAD</button>
       <button class="trickbtn up" type="button" data-air="2" data-trick="backScr">BACK SCR</button>
@@ -534,6 +549,10 @@
       <button class="trickbtn" type="button" data-air="2" data-trick="360">360</button>
       <button class="trickbtn" type="button" data-air="2" data-trick="backFull">BACK FULL</button>
       <button class="trickbtn" type="button" data-air="2" data-trick="cork720">CORK 720</button>
+      <button class="trickbtn" type="button" data-air="2" data-trick="cork1080">CORK 1080</button>
+      <button class="trickbtn" type="button" data-air="2" data-trick="cork1440">CORK 1440</button>
+      <button class="trickbtn" type="button" data-air="2" data-trick="dblFull">DBL FULL</button>
+      <button class="trickbtn" type="button" data-air="2" data-trick="loop">LOOP</button>
     </div>
     <div class="diffNote" id="trickNote"></div>
     <div id="repeatWarn"></div>
@@ -558,7 +577,7 @@
   <!-- ★v8.0 ツアー画面（§32）。起動したときの入口。難易度ボタンは出さない（大会が決める） -->
   <div class="overlay hidden" id="tourOverlay">
     <div class="ovTitle">MOGUL CHALLENGE</div>
-    <div class="ovSub">TOUR</div>
+    <div class="ovSub" id="tourSub">TOUR</div>
     <div id="tourChamp"></div>
     <div id="tourSteps"></div>
     <div id="tourInfo">
@@ -567,9 +586,9 @@
       <div id="tourMeta"></div>
       <div id="tourBest"></div>
     </div>
-    <div class="diffLbl">AIR 1 の技</div>
+    <div class="diffLbl" id="tourLbl1">AIR 1 の技</div>
     <div class="trickRow" id="tourTricks1"></div>
-    <div class="diffLbl" style="margin-top:7px">AIR 2 の技</div>
+    <div class="diffLbl" id="tourLbl2" style="margin-top:7px">AIR 2 の技</div>
     <div class="trickRow" id="tourTricks2"></div>
     <div id="tourRepeat"></div>
     <div id="tourBtnRow">
@@ -591,6 +610,9 @@
     <button class="bigbtn ghost sm" id="btnSampleSkip" type="button">とばす</button>
     <div id="sampleCap"><span>コブに合わせて</span> <span>ひざを曲げて</span> <span>吸収する</span></div>
   </div>
+
+  <!-- ★v8.6 新しい技が使えるようになった知らせ（重ねて 1 回・3 秒。§32.15） -->
+  <div id="ptNotice" class="hidden"></div>
 
   <div id="tutSide"></div>
   <div id="tutBar">
@@ -995,8 +1017,33 @@ var CONFIG = {
     'ironX':    { label:'IRON CROSS', code:'X',   dd:0.41, upright:true },
     '360':      { label:'360',       code:'3',   dd:0.68 },
     'backFull': { label:'BACK FULL', code:'bF',  dd:0.88 },
-    'cork720':  { label:'CORK 720',  code:'7op', dd:0.88 }
+    'cork720':  { label:'CORK 720',  code:'7op', dd:0.88 },
+    // ★v8.6 ポイントで使えるようになる技（§32.15）。DD は FIS 表 2023-11 男子（fis_mogul_dd_2023nov_extract.md）
+    'loop':     { label:'LOOP',        code:'l',    dd:0.68, byPoints:true },
+    'dblFull':  { label:'DOUBLE FULL', code:'bdF',  dd:1.05, byPoints:true },
+    'cork1080': { label:'CORK 1080',   code:'10op', dd:1.05, byPoints:true },
+    'cork1440': { label:'CORK 1440',   code:'14op', dd:1.22, byPoints:true }
   },
+  /* ★v8.6 ポイントで技を使えるようにする（§32.15。城さん確定 2026-09-28）
+     ・ツアーで完走するたびに TOTAL（四捨五入）を足す。フリープレイ・チュートリアル・リプレイ・見本・途中でやめたランは数えない
+     ・ここに書いた技だけがポイントで使えるようになる。今ある 6 つの技は、これまでどおり大会の通過で使えるようになる
+     ・使えるようになった技は、どの大会でも、フリープレイでも使える
+     ・順番は FIS の DD の低い順（同じ 1.05 はダブルフルが先）。数字の根拠：B級を通過できなかったランの TOTAL の中央値 26 点 */
+  pointUnlocks: [
+    { trick:'loop',     pt:150  },
+    { trick:'dblFull',  pt:400  },
+    { trick:'cork1080', pt:800  },
+    { trick:'cork1440', pt:1500 }
+  ],
+  /* ★v8.6 技の種類（FIS の DD 表の分け方。城さん確定）。技の欄が 1 段（4 つ）に収まらないときだけ、種類のタブにする */
+  trickCats: [
+    { key:'straight', label:'ストレート',   tricks:['spread','backScr','ironX'] },
+    { key:'rot',      label:'回転',         tricks:['360'] },
+    { key:'offaxis',  label:'オフアクシス', tricks:['cork720','cork1080','cork1440'] },
+    { key:'inv',      label:'宙返り',       tricks:['backFull','dblFull'] },
+    { key:'loop',     label:'ループ',       tricks:['loop'] }
+  ],
+  trickRowMax: 4,
 
   /* ---- 空中のボーナス入力（§17.7。★v7.0 → v7.1 → ★v7.2）----
      飛行の前半にもう 1 タップすると成立する。★任意。押さなくても今まで通り。
@@ -1041,7 +1088,12 @@ var CONFIG = {
     ironX:    { type:'double', kind:null, label:'KOSAK', effect:'ddAbs', dd:0.55, pose:'kosak' },
     '360':    { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
     cork720:  { type:'grab', kind:'mute',   label:'MUTE',   effect:'dd' },
-    backFull: { type:'hold', kind:null,     label:'HOLD',   effect:'quality' }
+    backFull: { type:'hold', kind:null,     label:'HOLD',   effect:'quality' },
+    // ★v8.6 新しい技のグラブは FIS 表の組み合わせの行の値そのもの（ddAbs）。ダブルフルはバックフルと同じホールド（評価点×1.08）
+    loop:     { type:'grab', kind:'safety', label:'SAFETY', effect:'ddAbs', dd:0.82 },   // Loop Grab lG（城さん：セーフティグラブ）
+    dblFull:  { type:'hold', kind:null,     label:'HOLD',   effect:'quality' },           // 城さん：バックフルと同じホールド（DD は動かさない）
+    cork1080: { type:'grab', kind:'mute',   label:'MUTE',   effect:'ddAbs', dd:1.20 },   // 10oG
+    cork1440: { type:'grab', kind:'mute',   label:'MUTE',   effect:'ddAbs', dd:1.39 }    // 14oG
   },
   // 飛行の進行 u のこの範囲のタップだけがグラブ。★着地の判定窓と重ねてはいけない。
   // 一番速い超級でも、着地の recover 窓は u≈0.69 から。0.55 で切れば 150ms 以上あく
@@ -1072,7 +1124,12 @@ var CONFIG = {
     'ironX':    { perfect:165, good:275, recover:380 },
     '360':      { perfect:140, good:240, recover:340 },
     'backFull': { perfect:110, good:200, recover:290 },
-    'cork720':  { perfect:110, good:200, recover:290 }
+    'cork720':  { perfect:110, good:200, recover:290 },
+    // ★v8.6 新しい技は BACK FULL・CORK 720 と同じ（城さん確定。難しさは DD で差を付ける）
+    'loop':     { perfect:110, good:200, recover:290 },
+    'dblFull':  { perfect:110, good:200, recover:290 },
+    'cork1080': { perfect:110, good:200, recover:290 },
+    'cork1440': { perfect:110, good:200, recover:290 }
   },
   airMissHorizon: 2.0,      // recover の何倍まで待つか。ここまで無入力なら FALL
 
@@ -1094,8 +1151,10 @@ var CONFIG = {
   },
 
   // 失敗の波及（§17.6）。人工的な減点は足さず、着地後の滑りへ効かせる
-  airMissSpeedLoss:   { spread:0.04, backScr:0.04, ironX:0.05, '360':0.06, backFull:0.12, cork720:0.12 },
-  airMissBalanceLoss: { spread:7,    backScr:7,    ironX:8,    '360':10,   backFull:20,   cork720:20 },
+  airMissSpeedLoss:   { spread:0.04, backScr:0.04, ironX:0.05, '360':0.06, backFull:0.12, cork720:0.12,
+                        loop:0.12, dblFull:0.12, cork1080:0.12, cork1440:0.12 },   // ★v8.6 新しい技は BACK FULL・CORK 720 と同じ
+  airMissBalanceLoss: { spread:7,    backScr:7,    ironX:8,    '360':10,   backFull:20,   cork720:20,
+                        loop:20,   dblFull:20,   cork1080:20,   cork1440:20 },
 
   /* ======== ここから下は §23 に無い実装・描画用（判定バランス非依存）======== */
   // エア区間 20m の内訳（m）。§7.3 の区間長は変えずに、この中でジャンプ台を配置する
@@ -1718,7 +1777,18 @@ var AIR_SPIN = {
   //   ★v6.6: 踏切は 360 と同じ（万歳しない）
   'cork720':  { flip: 0, yaw: 2, tilt: 0.00, wob: 0.00, arc: 2.09,
                 armMode: 'spread', tuck: 1, raise: 0, cross: 1,
-                armSpread: 11.5 }  // 2.09rad = 120° = 4 時
+                armSpread: 11.5 },  // 2.09rad = 120° = 4 時
+  /* ★v8.6 新しい技（回る向き・軸は城さんの確認まで仮。§32.15）
+     ループ：横向きの宙返り（真後ろから見ると画面の中で 1 回転する）【仮】
+     ダブルフル：バックフルのひねりを 2 回に。コーク 1080・1440：コーク 720 の回転を 3・4 回に */
+  'loop':     { flip: 1, yaw: 0, tilt: 0.00, wob: 0.00, arc: 0.00,
+                armMode: 'spread', raise: 0, armSpread: 11.5 },
+  'dblFull':  { flip: 0, yaw: 2, tilt: 0.00, wob: 0.03, arc: 0.00,
+                pitchTurns: 1, armMode: 'side', raise: 1, twist: 0.42 },
+  'cork1080': { flip: 0, yaw: 3, tilt: 0.00, wob: 0.00, arc: 2.09,
+                armMode: 'spread', tuck: 1, raise: 0, cross: 1, armSpread: 11.5 },
+  'cork1440': { flip: 0, yaw: 4, tilt: 0.00, wob: 0.00, arc: 2.09,
+                armMode: 'spread', tuck: 1, raise: 0, cross: 1, armSpread: 11.5 }
 };
 
 /* ★v7.0 技ごとの表の抜けを起動時に見つける（§22.1）。
@@ -1916,7 +1986,7 @@ function airBonusDone(b){ return b ? (b.type === 'grab' ? b.label + ' GRAB!' : b
 function airBonusEffectText(b){
   if (!b) return '';
   if (b.effect === 'dd')    return ' DD+' + CONFIG.grabDD.toFixed(2);
-  if (b.effect === 'ddAbs') return ' DD' + b.dd.toFixed(2) + '（ダブル）';
+  if (b.effect === 'ddAbs') return ' DD' + b.dd.toFixed(2) + (b.type === 'double' ? '（ダブル）' : '');
   return ' 評価点×' + CONFIG.grabQuality.toFixed(2);
 }
 function canGrab(a){
@@ -2442,11 +2512,21 @@ document.getElementById('btnResHome').addEventListener('click', goHome);
       var which = this.getAttribute('data-air');
       if (which === '2') CONFIG.selectedAir2 = this.getAttribute('data-trick');
       else               CONFIG.selectedAir1 = this.getAttribute('data-trick');
+      TRICK_TAB.start[which] = trickCatOf(this.getAttribute('data-trick'));   // ★v8.6
       resetGame();
       showStartOverlay();
     });
   }
 })();
+// ★v8.6 スタート画面の種類のタブ
+['1', '2'].forEach(function(sl){
+  document.getElementById('startLbl' + sl).addEventListener('click', function(e){
+    var b = e.target.closest('.trickTab');
+    if (!b) return;
+    TRICK_TAB.start[sl] = b.getAttribute('data-cat');
+    showStartOverlay();
+  });
+});
 document.getElementById('btnDebug').addEventListener('click', function(){
   showDebug = !showDebug;
   this.textContent = 'DEBUG ' + (showDebug ? 'ON' : 'OFF');
@@ -2493,7 +2573,8 @@ function tourEv(key){ var i = tourIdx(key); return i >= 0 ? CONFIG.tour[i] : nul
 
 function tourLoad(){
   // ★v8.1 tries＝完走した回数、clearTry＝初めて通過したのが何回目か（§32.10）。v:1 のまま足す（v8.0 の記録もそのまま読める）
-  var db = { v: 1, cleared: [], best: {}, champion: false, tries: {}, clearTry: {} };
+  // ★v8.6 points＝ためたポイント、ptSeen＝知らせを出し終えた技の数（§32.15）
+  var db = { v: 1, cleared: [], best: {}, champion: false, tries: {}, clearTry: {}, points: 0, ptSeen: 0 };
   if (!recordsAvailable) return db;
   try {
     var raw = window.localStorage.getItem(CONFIG.tourStoreKey);
@@ -2505,6 +2586,8 @@ function tourLoad(){
         db.champion = !!o.champion;
         if (o.tries && typeof o.tries === 'object') db.tries = o.tries;
         if (o.clearTry && typeof o.clearTry === 'object') db.clearTry = o.clearTry;
+        if (typeof o.points === 'number' && isFinite(o.points) && o.points > 0) db.points = o.points;
+        if (typeof o.ptSeen === 'number' && o.ptSeen > 0) db.ptSeen = o.ptSeen;
       }
     }
   } catch (e) { /* 壊れていたら既定値で続ける。消さない */ }
@@ -2590,9 +2673,95 @@ function showTourOverlay(key){
   resetGame();                 // 大会のコース長・難易度・技でコースを作り直す（hideOverlays も走る）
   renderTour(db);
   elTourOv.classList.remove('hidden');
-  sampleMaybeAuto();           // ★v8.5 初めてツアー画面を開いたときだけ見本を流す（§32.14）
+  sampleMaybeAuto();
+  ptNoticeMaybe();             // ★v8.6 新しい技が使えるようになっていたら 1 回だけ知らせる（見本の途中なら見本のあと）           // ★v8.5 初めてツアー画面を開いたときだけ見本を流す（§32.14）
 }
 window.showTourOverlay = showTourOverlay;
+
+/* =========================================================================
+   ★v8.6 ポイントで技を使えるようにする／技の種類のタブ（§32.15）
+   ========================================================================= */
+var TRICK_ORDER = [];
+CONFIG.trickCats.forEach(function(c){ TRICK_ORDER = TRICK_ORDER.concat(c.tricks); });
+var TRICK_TAB = { tour: { '1': null, '2': null }, start: { '1': null, '2': null } };
+function trickCatOf(t){
+  for (var i = 0; i < CONFIG.trickCats.length; i++) if (CONFIG.trickCats[i].tricks.indexOf(t) >= 0) return CONFIG.trickCats[i].key;
+  return null;
+}
+/* ポイントで使えるようになった技（解禁の順） */
+function ptUnlocked(db){
+  var pts = (db && db.points) || 0, out = [];
+  for (var i = 0; i < CONFIG.pointUnlocks.length; i++) if (pts >= CONFIG.pointUnlocks[i].pt) out.push(CONFIG.pointUnlocks[i].trick);
+  return out;
+}
+/* 並べる順（種類の順）にそろえる */
+function trickSort(list){
+  return list.slice().sort(function(a, b){ return TRICK_ORDER.indexOf(a) - TRICK_ORDER.indexOf(b); });
+}
+function tourTricksOf(ev, db){
+  var un = ptUnlocked(db), list = ev.tricks.slice();
+  for (var i = 0; i < un.length; i++) if (list.indexOf(un[i]) < 0) list.push(un[i]);
+  return trickSort(list);
+}
+/* フリープレイ：今ある 6 つ＋ポイントで使えるようになった技 */
+function freeTricks(){
+  var un = ptUnlocked(tourLoad()), out = [];
+  for (var t in CONFIG.airTricks) if (!CONFIG.airTricks[t].byPoints || un.indexOf(t) >= 0) out.push(t);
+  return trickSort(out);
+}
+/* ツアー画面の「TOUR」の行：TOUR ・ 120 pt ・ 次の技まで あと 30 */
+function ptLine(db){
+  if (!recordsAvailable) return 'TOUR';
+  var pts = db.points || 0, s = 'TOUR ・ ' + pts + ' pt';
+  for (var i = 0; i < CONFIG.pointUnlocks.length; i++) {
+    if (pts < CONFIG.pointUnlocks[i].pt) return s + ' ・ 次の技まで あと ' + (CONFIG.pointUnlocks[i].pt - pts);
+  }
+  return s;
+}
+/* 技の欄：1 段（trickRowMax）に収まるときは今までどおり全部並べる。
+   収まらないときだけ、ラベルの行に種類のタブを出し、選んだ種類の技だけを並べる（行の高さは変えない） */
+function applyTrickTabs(ctx, slot, lbl, row, avail, selected){
+  if (!lbl || !row) return;
+  var cats = CONFIG.trickCats.filter(function(c){ return c.tricks.some(function(t){ return avail.indexOf(t) >= 0; }); });
+  var useTabs = avail.length > CONFIG.trickRowMax && cats.length > 1;
+  var cur = null;
+  if (useTabs) {
+    var want = TRICK_TAB[ctx][slot] || trickCatOf(selected);
+    cur = cats.some(function(c){ return c.key === want; }) ? want : cats[0].key;
+    TRICK_TAB[ctx][slot] = cur;
+    var selCat = trickCatOf(selected);
+    lbl.classList.add('tabs');
+    lbl.innerHTML = 'AIR ' + slot + ' ' + cats.map(function(c){
+      return '<span class="trickTab' + (c.key === cur ? ' on' : '') + (c.key === selCat ? ' has' : '') +
+             '" data-air="' + slot + '" data-cat="' + c.key + '">' + c.label + '</span>';
+    }).join('');
+  } else {
+    lbl.classList.remove('tabs');
+    lbl.textContent = 'AIR ' + slot + ' の技';
+  }
+  var bs = row.querySelectorAll('.trickbtn');
+  for (var i = 0; i < bs.length; i++) {
+    var t = bs[i].getAttribute('data-trick');
+    var show = avail.indexOf(t) >= 0 && (!useTabs || trickCatOf(t) === cur);
+    bs[i].style.display = show ? '' : 'none';
+  }
+}
+/* 新しい技が使えるようになったら、次にツアー画面を開いたときに 1 回だけ知らせる（重ねて 3 秒。タップでも消える） */
+var PT_NOTICE_TIMER = null;
+function ptNoticeMaybe(){
+  if (!recordsAvailable || SAMPLE.on || elTourOv.classList.contains('hidden')) return;
+  var db = tourLoad(), un = ptUnlocked(db);
+  if (un.length <= (db.ptSeen || 0)) return;
+  var fresh = un.slice(db.ptSeen || 0);
+  db.ptSeen = un.length;
+  tourSave(db);
+  var el = document.getElementById('ptNotice');
+  el.textContent = '新しい技 ' + fresh.map(function(t){ return CONFIG.airTricks[t].label; }).join('・') + ' が使えるようになりました';
+  el.classList.remove('hidden');
+  if (PT_NOTICE_TIMER) clearTimeout(PT_NOTICE_TIMER);
+  PT_NOTICE_TIMER = setTimeout(function(){ el.classList.add('hidden'); }, 3000);
+}
+document.getElementById('ptNotice').addEventListener('click', function(){ this.classList.add('hidden'); });
 
 /* スタート画面の技ボタンと同じ表記を使う（二重に書かない） */
 function trickShortLabel(t){
@@ -2636,14 +2805,21 @@ function renderTour(db){
 
   // 使える技だけ出す。この大会で新しく使えるようになった技に NEW を付ける（§32.2）
   var sel = { '1': CONFIG.selectedAir1, '2': CONFIG.selectedAir2 };
+  var avail = tourTricksOf(ev, db);                    // ★v8.6 大会の技＋ポイントで使えるようになった技
+  if (TRICK_TAB.tourKey !== TOUR.key) { TRICK_TAB.tour = { '1': null, '2': null }; TRICK_TAB.tourKey = TOUR.key; }   // 大会を変えたら、選んでいる技の種類のタブから
   for (var slot = 1; slot <= 2; slot++) {
-    document.getElementById('tourTricks' + slot).innerHTML = ev.tricks.map(function(t){
-      var isNew = prev && prev.tricks.indexOf(t) < 0;
+    document.getElementById('tourTricks' + slot).innerHTML = avail.map(function(t){
+      var isNew = prev && ev.tricks.indexOf(t) >= 0 && prev.tricks.indexOf(t) < 0;
       return '<button class="trickbtn' + ((CONFIG.airTricks[t] || {}).upright ? ' up' : '') +
              (sel[slot] === t ? ' on' : '') + '" type="button" data-air="' + slot + '" data-trick="' + t + '">' +
              trickShortLabel(t) + (isNew ? '<i class="newTag">NEW</i>' : '') + '</button>';
     }).join('');
   }
+  for (var sl = 1; sl <= 2; sl++) {
+    applyTrickTabs('tour', String(sl), document.getElementById('tourLbl' + sl),
+                   document.getElementById('tourTricks' + sl), avail, sel[String(sl)]);
+  }
+  document.getElementById('tourSub').textContent = ptLine(db);
   document.getElementById('tourRepeat').textContent =
     (!CONFIG.airRepeatCounts && CONFIG.selectedAir1 === CONFIG.selectedAir2)
       ? '同じ技の 2 本目は AIR SCORE に入りません（FIS のリピート規定）' : '';
@@ -2660,11 +2836,21 @@ function renderTour(db){
     if (!b) return;
     var slot = b.getAttribute('data-air'), t = b.getAttribute('data-trick');
     if (slot === '2') CONFIG.selectedAir2 = t; else CONFIG.selectedAir1 = t;
+    TRICK_TAB.tour[slot] = trickCatOf(t);
     TOUR.picks[TOUR.key] = { a1: CONFIG.selectedAir1, a2: CONFIG.selectedAir2 };
     resetGame();
     renderTour(tourLoad());
     elTourOv.classList.remove('hidden');
   }
+  // ★v8.6 種類のタブ。押しても技は変わらない（並ぶ技だけが変わる）
+  function onTab(e){
+    var b = e.target.closest('.trickTab');
+    if (!b) return;
+    TRICK_TAB.tour[b.getAttribute('data-air')] = b.getAttribute('data-cat');
+    renderTour(tourLoad());
+  }
+  document.getElementById('tourLbl1').addEventListener('click', onTab);
+  document.getElementById('tourLbl2').addEventListener('click', onTab);
   document.getElementById('tourTricks1').addEventListener('click', onTrick);
   document.getElementById('tourTricks2').addEventListener('click', onTrick);
   document.getElementById('btnTourStart').addEventListener('click', function(){ startCountdown(); });
@@ -2704,6 +2890,9 @@ function tourPush(s){
   var prevBest = typeof db.best[ev.key] === 'number' ? db.best[ev.key] : null;
   var isPb = prevBest === null || total > prevBest;
   if (isPb) db.best[ev.key] = total;
+  // ★v8.6 完走したらポイントを足す（TOTAL を四捨五入。§32.15）。ここに来るのは完走したツアーのランだけ
+  var ptGain = Math.max(0, Math.round(total));
+  db.points = (db.points || 0) + ptGain;
   var newClear = passed && db.cleared.indexOf(ev.key) < 0;
   if (newClear) { db.cleared.push(ev.key); db.clearTry[ev.key] = tries; }   // ★v8.1 何回目で通過したか
   var last = idx === CONFIG.tour.length - 1;
@@ -2713,7 +2902,7 @@ function tourPush(s){
   return { tour: true, key: ev.key, total: total, rank: st.rank, rows: st.rows,
            field: ev.field, passRank: ev.passRank, passed: passed, need: need, lineScore: lineScore,
            prevBest: prevBest, isPb: isPb, saved: saved, newClear: newClear, tries: tries,
-           champion: passed && last, champNow: champNow,
+           champion: passed && last, champNow: champNow, ptGain: ptGain, points: db.points,
            next: (passed && !last) ? CONFIG.tour[idx + 1].key : null };
 }
 
@@ -2815,7 +3004,8 @@ function spacingRangeText(){
    ・localStorage が使えない環境（プライベートブラウズ等）でも落ちないこと（§19.2）
    ========================================================================= */
 var TRICK_ABBR = { spread:'SP', backScr:'BS', ironX:'IX',
-                   '360':'360', 'backFull':'BF', 'cork720':'CK' };
+                   '360':'360', 'backFull':'BF', 'cork720':'CK',
+                   loop:'LP', dblFull:'DF', cork1080:'C10', cork1440:'C14' };   // ★v8.6
 var lastRunStamp = null;   // 直前に完走したランの時刻。ランキングで色を付けるため。
                            // G に持つと HOME や RETRY で消えるのでここに置く
 
@@ -3524,11 +3714,19 @@ function showStartOverlay(){
     (DIFF_NOTE[CONFIG.difficulty] || '') + '　' + spacingRangeText();
 
   // AIR 1 / AIR 2 の技（§17.2 事前選択）。同じ技を選んでよい（Variety は STEP 6）
+  // ★v8.6 ポイントで使えるようになっていない新しい技は、フリープレイでも選べない（§32.15）
+  var freeAvail = freeTricks();
+  if (freeAvail.indexOf(CONFIG.selectedAir1) < 0) CONFIG.selectedAir1 = '360';
+  if (freeAvail.indexOf(CONFIG.selectedAir2) < 0) CONFIG.selectedAir2 = 'backFull';
   var sel = { '1': CONFIG.selectedAir1, '2': CONFIG.selectedAir2 };
   var tb = document.querySelectorAll('.trickbtn');
   for (var t = 0; t < tb.length; t++) {
     var ai = tb[t].getAttribute('data-air');
     tb[t].classList.toggle('on', tb[t].getAttribute('data-trick') === sel[ai]);
+  }
+  for (var sl = 1; sl <= 2; sl++) {
+    applyTrickTabs('start', String(sl), document.getElementById('startLbl' + sl),
+                   document.querySelector('#startOverlay .trickRow[data-air="' + sl + '"]'), freeAvail, sel[String(sl)]);
   }
   var t1 = CONFIG.airTricks[CONFIG.selectedAir1], t2 = CONFIG.airTricks[CONFIG.selectedAir2];
   document.getElementById('trickNote').textContent =
@@ -5153,13 +5351,25 @@ function fvPrepare(){
 }
 // 斜面の高さ。ゴールから先は緩い平らな場所（6°）にする（案B のカメラがゴールの先に立つため）
 var FV_TAN_OUT = Math.tan(6 * Math.PI / 180);
-/* 前からの視点の足の横の位置：ターンの頂点（FV.turns）の間を cos でつなぐ。頂点が 4.5 m 以上離れている区間（エアなど）は null */
+/* 前からの視点の足の横の位置：ターンの頂点（FV.turns）の間を cos でつなぐ。
+   ★v8.6 コブの列が途切れている所（スタートの前・エアの前後・ゴールの後）は、前の頂点から半コブ（1.75 m）で真ん中へ戻り、
+   次の頂点の半コブ手前から出ていく。v8.5 までは null を返して上から見る画面の横の動きに切り替えていたので、
+   切り替わる所で足が横に跳んでいた（城さん指摘 2026-09-28） */
+var FV_GAP_EASE = 1.75;
+/* コブとコブの間はどれだけ広くても（W杯は間隔がばらついて 5 m を超える所がある）ターンの頂点どうしをつなぐ。
+   真ん中へ戻すのは、エア・スタート・ゴールのようにコブの列が途切れている所だけ（9 m より広い所） */
+var FV_GAP_WIDE = 9.0;
+function fvEase01(u){ u = clamp(u, 0, 1); return (1 - Math.cos(Math.PI * u)) / 2; }
 function fvFootX(z){
-  var t = FV.turns; if (!t || !t.length) return null;
-  var lo = 0, hi = t.length - 1;
-  if (z < t[0].z || z > t[hi].z) return null;
+  var t = FV.turns; if (!t || !t.length) return 0;
+  var lo = 0, hi = t.length - 1, R = FV_GAP_EASE;
+  if (z <= t[0].z)  return FV_SWING * t[0].e  * fvEase01(1 - (t[0].z - z) / R);
+  if (z >= t[hi].z) return FV_SWING * t[hi].e * (1 - fvEase01((z - t[hi].z) / R));
   while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (t[mid].z <= z) lo = mid; else hi = mid; }
-  var a = t[lo], c = t[hi]; if (c.z - a.z > 4.5) return null;
+  var a = t[lo], c = t[hi];
+  if (c.z - a.z > FV_GAP_WIDE) {
+    return FV_SWING * (a.e * (1 - fvEase01((z - a.z) / R)) + c.e * fvEase01(1 - (c.z - z) / R));
+  }
   var u = (z - a.z) / Math.max(0.01, c.z - a.z), w = (1 - Math.cos(Math.PI * u)) / 2;
   return FV_SWING * (a.e + (c.e - a.e) * w);
 }
@@ -5214,6 +5424,8 @@ function fvP(cam, xg, y, z){
 }
 
 /* ---- 選手の姿勢（記録から。描くだけ） ---- */
+/* ★v8.6 回る技の回し方：yaw＝縦軸（360）／full＝ひねり＋宙返り（バックフル・ダブルフル）／cork＝傾けた軸／side＝横向きの宙返り（ループ。仮） */
+var FV_SPIN_TRICKS = { '360':'yaw', backFull:'full', dblFull:'full', cork720:'cork', cork1080:'cork', cork1440:'cork', loop:'side' };
 /* ★段階2 ② 回る技の向きと軸（城さんの確認まで仮。ここだけ直せば全部変わる）
    yaw：+1＝左回り（上から見て反時計回り）／flip：+1＝後ろ宙返り（頭が山側へ）／corkTilt：コークの軸を縦から倒す角度（度、＋＝選手の右へ）
    twist：バックフルのひねりの向き（+1＝左） */
@@ -5265,11 +5477,13 @@ function fvSkier(){
         bs = pk;
         safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
       }
-      else if (air.trick === '360' || air.trick === 'backFull' || air.trick === 'cork720') {
+      else if (FV_SPIN_TRICKS[air.trick]) {
         var sd = AIR_SPIN[air.trick] || {}, mx = Math.max(sd.flip || 0, sd.yaw || 0, 1e-6);
         var fr = clamp(air.rot / mx, 0, 1);                    // 回転の進み 0〜1（タップした所で止まる。早すぎると回り足りずに着地）
         spin = { trick: air.trick, yawTurns: fr * (sd.yaw || 0), flipTurns: fr * (sd.pitchTurns || 0) };
-        if (air.trick === 'cork720') tuck = Math.sin(Math.PI * fr) * (1 - open);          // コークは途中で抱え込む
+        spin.sideTurns = fr * (sd.flip || 0);                  // ★v8.6 ループ（横向きの宙返り。仮）
+        safety = (air.bonusOn && air.bonusKind === 'safety') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;   // ★v8.6 ループの SAFETY
+        if (FV_SPIN_TRICKS[air.trick] === 'cork') tuck = Math.sin(Math.PI * fr) * (1 - open);          // コークは途中で抱え込む
         mute = (air.bonusOn && air.bonusKind === 'mute') ? clamp(air.grabT, 0, 1) * (1 - open) : 0;
       }
       else other = air.trick;
@@ -5379,8 +5593,13 @@ function fvSkier(){
     var upv = { xg: hip.xg, y: hip.y + 1, z: hip.z };
     pts.push(fwd, upv);
     var yawA = 2 * Math.PI * spin.yawTurns;
-    if (spin.trick === '360') pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.yaw * yawA); });
-    else if (spin.trick === 'backFull') {
+    var kindS = FV_SPIN_TRICKS[spin.trick];
+    if (kindS === 'yaw') pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.yaw * yawA); });
+    else if (kindS === 'side') {
+      // ★v8.6 ループ：コースの向き（z）を軸に横へ 1 回転【仮】
+      pts.forEach(function(q){ fvRotAxis(q, ctr, [0, 0, 1], FV_SPIN_DIR.flip * 2 * Math.PI * spin.sideTurns); });
+    }
+    else if (kindS === 'full') {
       // ひねり（体の縦軸）→ 宙返り（横軸）の順に回す
       pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.twist * yawA); fvRotX(q, ctr, FV_SPIN_DIR.flip * 2 * Math.PI * spin.flipTurns); });
     } else {
@@ -5697,14 +5916,9 @@ function renderFront(){
     else if (it.t === 2) { fvDrawGate(cam, -FV.courseHalf, it.o.z, it.o.col); fvDrawGate(cam, FV.courseHalf, it.o.z, it.o.col); }
     else if (it.t === 3) fvDrawKicker(cam, it.o);
     else if (it.t === 4) fvDrawFinish(cam, st);
-    else { fvDrawSpray(cam, st); fvDrawSkier(cam, st); if (REPLAY.view === 'frontA' && !REPLAY.sample) fvDrawHeadGuide(cam, st); }
+    else { fvDrawSpray(cam, st); fvDrawSkier(cam, st); /* ★v8.6 頭の高さの点線は出さない（城さん 2026-09-28） */ }
   }
-  // 案B で選手が小さいときは輪で示す
-  var hp = fvP(cam, st.hip.xg, st.hip.y, st.zs);
-  if (hp && hp.s * 1.8 < 40) {
-    ctx.strokeStyle = 'rgba(216,65,47,.85)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(hp.x, hp.y - 0.2 * hp.s, 18, 0, Math.PI * 2); ctx.stroke();
-  }
+  // ★v8.6 選手を囲む赤い輪は出さない（城さん 2026-09-28）
 }
 function replaySetView(v){
   REPLAY.view = v;
@@ -5791,6 +6005,7 @@ function sampleEnd(){
   elTourOv.classList.remove('hidden');
   showJudge(null);
   updateHud();
+  ptNoticeMaybe();             // ★v8.6 見本のあとに知らせを出す
 }
 function sampleSeen(){
   try { return window.localStorage.getItem(SAMPLE_KEY) === '1'; } catch (e) { return true; }   // 読めない＝自動で流さない
