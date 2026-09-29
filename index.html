@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.12 -->
+<!-- MOGUL CHALLENGE v8.13 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -5674,7 +5674,11 @@ var FV_LOOK = {
      体を横へ倒しながら、逆さの斜め（頭が左下）まで大きく倒して回る。膝は軽く曲げるだけ（抱え込まない）。
      逆さのあたりで板が × に交差し、片腕はストックごと外へ伸ばす。
      noGrab：空中でグラブ（MUTE）したときは、v8.11 までの形（傾けた軸・抱え込み・ミュートの手）に戻す */
-  cork720:  { offAxis: 145, leanPow: 0.45, noGrab: true, bend: 0.35, cross: 0.75, armOut: true }
+  cork720:  { offAxis: 145, leanPow: 0.45, bend: 0.35, cross: 0.75, armOut: true,
+  /* ★v8.13 MUTE：城さんのミュートの動画（260923_145355.MOV、2026-09-29）に合わせた形。
+     回し方はグラブなしと同じ。右手で左の板（× に交差した板）をつかみ、板を少し引き寄せる（板先が体の方へ上がる）。
+     膝をもっと抱え、板の × を強くし、左腕はストックごと外へ伸ばす。v8.12 の「グラブしたら v8.11 の形へ戻す」はやめた */
+             mute: { bend: 0.85, cross: 1.05, pull: 0.35 } }
 };
 function fvRotY(q, c, a){ var x = q.xg - c.xg, z = q.z - c.z; q.xg = c.xg + x * Math.cos(a) - z * Math.sin(a); q.z = c.z + x * Math.sin(a) + z * Math.cos(a); }
 function fvRotX(q, c, b){ var y = q.y - c.y, z = q.z - c.z; q.y = c.y + y * Math.cos(b) + z * Math.sin(b); q.z = c.z - y * Math.sin(b) + z * Math.cos(b); }
@@ -5733,9 +5737,10 @@ function fvSkier(){
         spin.fr = fr; spin.open = open;
         gAmt = (air.bonusOn && air.bonusKind) ? clamp(air.grabT, 0, 1) * (1 - open) : 0; gKind = air.bonusKind;   // ★v8.7
         var lk0 = FV_LOOK[air.trick];
-        if (lk0 && lk0.noGrab) {                           // ★v8.12 グラブしていない分だけ新しい形（gw＝0〜1）
-          spin.gw = air.bonusOn ? 1 - clamp(air.grabT, 0, 1) : 1;
-          tuck *= (1 - spin.gw) + spin.gw * lk0.bend;
+        if (lk0 && lk0.bend !== undefined) {               // ★v8.12 膝は軽く曲げるだけ ★v8.13 MUTE ではもっと抱える（gm＝つかんだ量）
+          spin.gw = 1;
+          spin.gm = (lk0.mute && gKind === 'mute') ? gAmt : 0;
+          tuck *= lk0.bend + ((lk0.mute ? lk0.mute.bend : lk0.bend) - lk0.bend) * spin.gm;
         }
       }
       else other = air.trick;
@@ -5804,6 +5809,17 @@ function fvSkier(){
     var outH = [ { xg: sho.xg - 0.08, y: sho.y - 0.26, z: sho.z + 0.26 }, { xg: shR.xg + 0.50, y: sho.y + 0.30, z: sho.z + 0.05 } ];
     for (var ao = 0; ao < 2; ao++) hands[ao] = { xg: hands[ao].xg + (outH[ao].xg - hands[ao].xg) * armW, y: hands[ao].y + (outH[ao].y - hands[ao].y) * armW, z: hands[ao].z + (outH[ao].z - hands[ao].z) * armW };
   }
+  // ★v8.13 コーク 720 の × の量（MUTE では強く）と、つかんだ左の板を引き寄せる量
+  var xwC = 0, pullL = 0, muteW = 0;
+  if (look && look.cross && airH > 0.05) {
+    var gm = spin.gm || 0, crossM = look.mute ? look.mute.cross : look.cross;
+    xwC = (look.cross + (crossM - look.cross) * gm) * Math.pow(Math.sin(Math.PI * spin.fr), 1.5) * (1 - spin.open);
+    if (look.mute) { muteW = gm * Math.min(1, 2.2 * Math.sin(Math.PI * spin.fr)); pullL = -look.mute.pull * muteW; }   // 着地前には手を放す
+  }
+  if (muteW > 0) {   // 左腕はストックごと外へ
+    var oL = { xg: shL.xg - 0.55, y: sho.y - 0.02, z: sho.z + 0.06 };
+    hands[0] = { xg: hands[0].xg + (oL.xg - hands[0].xg) * muteW, y: hands[0].y + (oL.y - hands[0].y) * muteW, z: hands[0].z + (oL.z - hands[0].z) * muteW };
+  }
   var plant = (p.poleT > 0 && airH <= 0.05) ? clamp(p.poleT / 0.18, 0, 1) : 0;
   var pside = p.poleSide >= 0 ? 1 : 0;
   if (plant > 0) { var hh = hands[pside]; hh.y -= 0.10 * plant; hh.z += 0.18 * plant; hh.xg += (pside ? 0.06 : -0.06) * plant; }
@@ -5814,7 +5830,12 @@ function fvSkier(){
   // ★v8.7 グラブの手（z＋ がトップ側）。MUTE・SAFETY は v8.6 と同じ位置。JAPAN・TAIL・TRUCK DRIVER は仮
   function grabHand(hi, to){ var h0 = hands[hi]; hands[hi] = { xg: h0.xg + (to.xg - h0.xg) * gAmt, y: h0.y + (to.y - h0.y) * gAmt, z: h0.z + (to.z - h0.z) * gAmt }; }
   if (gTy) {
-    if (gKind === 'mute')   grabHand(0, { xg: fRa.xg - 0.05, y: fRa.y + 0.10, z: fRa.z + 0.25 });   // 左手で右の板の前
+    if (gKind === 'mute' && muteW > 0) {                                                        // ★v8.13 コーク 720：右手で左の板（交差した所の少し先）
+      var gd = 0.30, gp = pullL, ga = xwC;
+      var gt1 = { xg: fL.xg + Math.sin(ga) * gd * Math.cos(gp), y: fL.y + 0.10 * gd / 0.88 - gd * Math.sin(gp) + 0.04, z: fL.z + Math.cos(ga) * gd * Math.cos(gp) }, h1 = hands[1];
+      hands[1] = { xg: h1.xg + (gt1.xg - h1.xg) * muteW, y: h1.y + (gt1.y - h1.y) * muteW, z: h1.z + (gt1.z - h1.z) * muteW };
+    }
+    else if (gKind === 'mute') grabHand(0, { xg: fRa.xg - 0.05, y: fRa.y + 0.10, z: fRa.z + 0.25 });   // 左手で右の板の前
     if (gKind === 'safety') grabHand(1, { xg: fRa.xg + 0.12, y: fRa.y + 0.05, z: fRa.z + 0.10 });   // 右手で右の板
     if (gKind === 'japan')  grabHand(0, { xg: fRa.xg + 0.02, y: fRa.y + 0.16, z: fRa.z + 0.16 });   // 左手で右の板（抱え込んで引き寄せる）
     if (gKind === 'tail')   grabHand(1, { xg: fRa.xg + 0.12, y: fRa.y + 0.10, z: fRa.z - 0.38 });   // 右手で右の板のテール
@@ -5830,10 +5851,11 @@ function fvSkier(){
     if (plant > 0 && hi === pside) tip = { xg: h.xg + (hi ? 0.10 : -0.10), y: fvGround(h.xg, zs + 0.95), z: zs + 0.95 };
     else if (airH > 0.05) {
       tip = { xg: h.xg + (hi ? 0.35 : -0.35), y: h.y - 0.85, z: h.z - 0.55 };
-      if (armW > 0 && hi === 1) {                      // ★v8.12 肩→手の向きへまっすぐ（動画どおり）
-        var ex = h.xg - shR.xg, ey = h.y - shR.y, ez = h.z - shR.z, el = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
+      var aw = hi === 1 ? armW * (1 - muteW) : muteW, shX = hi === 1 ? shR : shL;   // ★v8.13 MUTE では右手は板、左腕が外
+      if (aw > 0) {                                    // ★v8.12 肩→手の向きへまっすぐ（動画どおり）
+        var ex = h.xg - shX.xg, ey = h.y - shX.y, ez = h.z - shX.z, el = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
         var t2 = { xg: h.xg + ex / el * 1.0, y: h.y + ey / el * 1.0, z: h.z + ez / el * 1.0 };
-        tip = { xg: tip.xg + (t2.xg - tip.xg) * armW, y: tip.y + (t2.y - tip.y) * armW, z: tip.z + (t2.z - tip.z) * armW };
+        tip = { xg: tip.xg + (t2.xg - tip.xg) * aw, y: tip.y + (t2.y - tip.y) * aw, z: tip.z + (t2.z - tip.z) * aw };
       }
     }
     else tip = { xg: h.xg + (hi ? 0.06 : -0.06), y: h.y - 0.95, z: h.z - 0.60 };
@@ -5848,15 +5870,15 @@ function fvSkier(){
   var skiPitch = 1.25 * bs - 1.15 * kz;
   if (kz > 0) { heads[0] -= 0.35 * kz; heads[1] += 0.35 * kz; }
   if (look && look.cross && airH > 0.05) {   // ★v8.12 コーク 720：逆さのあたりで板が × に交差（左の板の先が右へ）
-    var xw = look.cross * spin.gw * Math.pow(Math.sin(Math.PI * spin.fr), 1.5) * (1 - spin.open);
-    heads[0] += xw; heads[1] -= xw;
+    heads[0] += xwC; heads[1] -= xwC;                // ★v8.13 量は上で計算（MUTE では強く）
   }   // コザック：板先を上に向けて V に開く   // ＋＝板先が下（バックスクラッチャー）、−＝板先が上（コザック）   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
   [fL, fR].forEach(function(f, idx){
     var a = heads[idx], sx = Math.sin(a), cz = Math.cos(a);
     var tipZ = f.z + cz * 0.88, tailZ = f.z - cz * 0.80, tipX = f.xg + sx * 0.88, tailX = f.xg - sx * 0.80;
     var yT, yB;
     if (airH > 0.05) {
-      var cp = Math.cos(skiPitch), spp = Math.sin(skiPitch);
+      var sp2 = skiPitch + (idx === 0 ? pullL : 0);   // ★v8.13 MUTE：つかんだ左の板の先を体の方へ引き上げる
+      var cp = Math.cos(sp2), spp = Math.sin(sp2);
       tipZ = f.z + cz * 0.88 * cp; tailZ = f.z - cz * 0.80 * cp; tipX = f.xg + sx * 0.88 * cp; tailX = f.xg - sx * 0.80 * cp;
       yT = f.y + 0.10 - 0.88 * spp; yB = f.y - 0.02 + 0.80 * spp;
     }
