@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.11 -->
+<!-- MOGUL CHALLENGE v8.12 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -5669,7 +5669,12 @@ var FV_LOOK = {
   dblFull:  { layout: true, armsIn: true, flipTilt: 17.5, dwell: 1.8 },
   // offAxis：体を横へ倒す最大の角度（＋で頭が画面の左）
   cork1080: { offAxis: 80, tuckHold: true },
-  cork1440: { offAxis: 80, tuckHold: true }
+  cork1440: { offAxis: 80, tuckHold: true },
+  /* ★v8.12 コーク 720（グラブなしのとき）：城さんのウォータージャンプの動画（2026-09-29、正面・横）に合わせた形。
+     体を横へ倒しながら、逆さの斜め（頭が左下）まで大きく倒して回る。膝は軽く曲げるだけ（抱え込まない）。
+     逆さのあたりで板が × に交差し、片腕はストックごと外へ伸ばす。
+     noGrab：空中でグラブ（MUTE）したときは、v8.11 までの形（傾けた軸・抱え込み・ミュートの手）に戻す */
+  cork720:  { offAxis: 145, leanPow: 0.45, noGrab: true, bend: 0.35, cross: 0.75, armOut: true }
 };
 function fvRotY(q, c, a){ var x = q.xg - c.xg, z = q.z - c.z; q.xg = c.xg + x * Math.cos(a) - z * Math.sin(a); q.z = c.z + x * Math.sin(a) + z * Math.cos(a); }
 function fvRotX(q, c, b){ var y = q.y - c.y, z = q.z - c.z; q.y = c.y + y * Math.cos(b) + z * Math.sin(b); q.z = c.z - y * Math.sin(b) + z * Math.cos(b); }
@@ -5727,6 +5732,11 @@ function fvSkier(){
         if (FV_LOOK[air.trick] && FV_LOOK[air.trick].tuckHold) tuck = Math.min(1, 1.8 * Math.sin(Math.PI * fr)) * (1 - open);   // ★v8.9 空中ではずっと抱え込む
         spin.fr = fr; spin.open = open;
         gAmt = (air.bonusOn && air.bonusKind) ? clamp(air.grabT, 0, 1) * (1 - open) : 0; gKind = air.bonusKind;   // ★v8.7
+        var lk0 = FV_LOOK[air.trick];
+        if (lk0 && lk0.noGrab) {                           // ★v8.12 グラブしていない分だけ新しい形（gw＝0〜1）
+          spin.gw = air.bonusOn ? 1 - clamp(air.grabT, 0, 1) : 1;
+          tuck *= (1 - spin.gw) + spin.gw * lk0.bend;
+        }
       }
       else other = air.trick;
     }
@@ -5788,6 +5798,12 @@ function fvSkier(){
     var inH = [ { xg: sho.xg - 0.09, y: sho.y - 0.20, z: sho.z + 0.17 }, { xg: sho.xg + 0.09, y: sho.y - 0.20, z: sho.z + 0.17 } ];
     for (var ah = 0; ah < 2; ah++) hands[ah] = { xg: hands[ah].xg + (inH[ah].xg - hands[ah].xg) * ai, y: hands[ah].y + (inH[ah].y - hands[ah].y) * ai, z: hands[ah].z + (inH[ah].z - hands[ah].z) * ai };
   }
+  var armW = 0;   // ★v8.12 コーク 720：片腕を外へ伸ばす量
+  if (look && look.armOut && airH > 0.05) {
+    armW = spin.gw * Math.min(1, 2.2 * Math.sin(Math.PI * spin.fr)) * (1 - spin.open);
+    var outH = [ { xg: sho.xg - 0.08, y: sho.y - 0.26, z: sho.z + 0.26 }, { xg: shR.xg + 0.50, y: sho.y + 0.30, z: sho.z + 0.05 } ];
+    for (var ao = 0; ao < 2; ao++) hands[ao] = { xg: hands[ao].xg + (outH[ao].xg - hands[ao].xg) * armW, y: hands[ao].y + (outH[ao].y - hands[ao].y) * armW, z: hands[ao].z + (outH[ao].z - hands[ao].z) * armW };
+  }
   var plant = (p.poleT > 0 && airH <= 0.05) ? clamp(p.poleT / 0.18, 0, 1) : 0;
   var pside = p.poleSide >= 0 ? 1 : 0;
   if (plant > 0) { var hh = hands[pside]; hh.y -= 0.10 * plant; hh.z += 0.18 * plant; hh.xg += (pside ? 0.06 : -0.06) * plant; }
@@ -5812,7 +5828,14 @@ function fvSkier(){
   for (var hi = 0; hi < 2; hi++) {
     var h = hands[hi], tip;
     if (plant > 0 && hi === pside) tip = { xg: h.xg + (hi ? 0.10 : -0.10), y: fvGround(h.xg, zs + 0.95), z: zs + 0.95 };
-    else if (airH > 0.05) tip = { xg: h.xg + (hi ? 0.35 : -0.35), y: h.y - 0.85, z: h.z - 0.55 };
+    else if (airH > 0.05) {
+      tip = { xg: h.xg + (hi ? 0.35 : -0.35), y: h.y - 0.85, z: h.z - 0.55 };
+      if (armW > 0 && hi === 1) {                      // ★v8.12 肩→手の向きへまっすぐ（動画どおり）
+        var ex = h.xg - shR.xg, ey = h.y - shR.y, ez = h.z - shR.z, el = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
+        var t2 = { xg: h.xg + ex / el * 1.0, y: h.y + ey / el * 1.0, z: h.z + ez / el * 1.0 };
+        tip = { xg: tip.xg + (t2.xg - tip.xg) * armW, y: tip.y + (t2.y - tip.y) * armW, z: tip.z + (t2.z - tip.z) * armW };
+      }
+    }
     else tip = { xg: h.xg + (hi ? 0.06 : -0.06), y: h.y - 0.95, z: h.z - 0.60 };
     poles.push([h, tip]);
   }
@@ -5823,7 +5846,11 @@ function fvSkier(){
   // スプレッドは V、アイアンクロスは × に交差（左の板の先が右へ）
   var heads = [hd0 - 0.30 * sp + 0.75 * ix, hd0 + 0.30 * sp - 0.75 * ix];
   var skiPitch = 1.25 * bs - 1.15 * kz;
-  if (kz > 0) { heads[0] -= 0.35 * kz; heads[1] += 0.35 * kz; }   // コザック：板先を上に向けて V に開く   // ＋＝板先が下（バックスクラッチャー）、−＝板先が上（コザック）   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
+  if (kz > 0) { heads[0] -= 0.35 * kz; heads[1] += 0.35 * kz; }
+  if (look && look.cross && airH > 0.05) {   // ★v8.12 コーク 720：逆さのあたりで板が × に交差（左の板の先が右へ）
+    var xw = look.cross * spin.gw * Math.pow(Math.sin(Math.PI * spin.fr), 1.5) * (1 - spin.open);
+    heads[0] += xw; heads[1] -= xw;
+  }   // コザック：板先を上に向けて V に開く   // ＋＝板先が下（バックスクラッチャー）、−＝板先が上（コザック）   // 板の向き：前から見るとコブの面に沿って寝て見えるので、振りは ±16° までにする
   [fL, fR].forEach(function(f, idx){
     var a = heads[idx], sx = Math.sin(a), cz = Math.cos(a);
     var tipZ = f.z + cz * 0.88, tailZ = f.z - cz * 0.80, tipX = f.xg + sx * 0.88, tailX = f.xg - sx * 0.80;
@@ -5870,8 +5897,14 @@ function fvSkier(){
     }
     else if (look && look.offAxis) {
       // ★v8.9 コーク 1080・1440：体の縦軸で回しながら、体ごと横へ倒す（踏切と着地の前は立てる）
-      var lean = look.offAxis * Math.PI / 180 * Math.pow(Math.sin(Math.PI * spin.fr), 0.55) * (1 - spin.open);
-      pts.forEach(function(q){ fvRotY(q, ctr, FV_SPIN_DIR.yaw * yawA); fvRotAxis(q, ctr, [0, 0, 1], FV_LEAN_SIGN * lean); });
+      var lean = look.offAxis * Math.PI / 180 * Math.pow(Math.sin(Math.PI * spin.fr), look.leanPow || 0.55) * (1 - spin.open);
+      var wOld = look.noGrab ? 1 - spin.gw : 0;          // ★v8.12 グラブした分は v8.11 までの回し方
+      var tt0 = FV_SPIN_DIR.corkTilt * Math.PI / 180, n0 = [Math.sin(tt0), Math.cos(tt0), 0];
+      pts.forEach(function(q){
+        var o = wOld > 0 ? { xg: q.xg, y: q.y, z: q.z } : null;
+        fvRotY(q, ctr, FV_SPIN_DIR.yaw * yawA); fvRotAxis(q, ctr, [0, 0, 1], FV_LEAN_SIGN * lean);
+        if (o) { fvRotAxis(o, ctr, n0, FV_SPIN_DIR.yaw * yawA); q.xg += (o.xg - q.xg) * wOld; q.y += (o.y - q.y) * wOld; q.z += (o.z - q.z) * wOld; }
+      });
     } else {
       var tt = FV_SPIN_DIR.corkTilt * Math.PI / 180, n = [Math.sin(tt), Math.cos(tt), 0];
       pts.forEach(function(q){ fvRotAxis(q, ctr, n, FV_SPIN_DIR.yaw * yawA); });
