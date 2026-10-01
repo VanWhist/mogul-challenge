@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- MOGUL CHALLENGE v8.15 -->
+<!-- MOGUL CHALLENGE v8.16 -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -911,9 +911,10 @@ var CONFIG = {
 
   // ---- 選手の反応（すべて視覚表現。判定には一切使わない）----
   upperBodyFixed:   true,   // 上体をフォールライン側に固定し、脚だけ振る
-  turnKneeFlex:     0.36,   // ★v8.15 前から見る視点：コブで脚を振り切ったとき、少なくともこれだけ脚を縮める（m）
+  turnKneeFlex:     0,      // ★v8.15 前から見る視点：コブで脚を振り切ったとき脚を縮める量（m）。★v8.16 0（腰が下がって頭が上下に揺れたため）
   turnKneeTogether: 0.70,   // ★v8.15 同じく、両膝をそろえる割合
-  turnKneeIn:       0.80,   // ★v8.15 同じく、膝を腰の下へ寄せる割合（すねから下で外へ逃がす）
+  turnKneeIn:       1.25,   // ★v8.15 同じく、膝を腰の下へ寄せる割合（すねから下で外へ逃がす）。★v8.16 0.80→1.25（腰より内側まで入れて膝の角度を強く）
+  turnKneeFwd:      0.12,   // ★v8.16 同じく、膝を前へ出す量（m）
   turnHand:         { dx: 0.14, dy: -0.48, dz: 0.28 },   // ★v8.15 同じく、両手の位置（肩から。胸の高さで体の前・少し外）
   torsoFollow:      0.10,   // 上体が横移動に追従する割合（0=完全固定）
   hipFollow:        0.22,   // 腰が横移動に追従する割合
@@ -5779,7 +5780,8 @@ function fvSkier(){
      swN＝足の横の振れ（0＝まっすぐ、1＝いちばん外）。吸収が浅くても、コブでは膝を曲げた形にする（深く吸収しているときは今までどおり） */
   var swN = (fx !== null && airH <= 0.05 && G.fallAnim <= 0.02) ? clamp(Math.abs(fx) / FV_SWING, 0, 1) : 0;
   swN = swN * swN * (3 - 2 * swN);
-  if (swN > 0) L = Math.min(L, 0.90 - CONFIG.turnKneeFlex * swN);   // コブの頂点では少なくともこれだけ曲げる
+  // ★v8.16 腰の高さ（＝頭の上下）は v8.14 までと同じに戻す（城さん：頭が上下に激しく揺れる）。膝の角度は膝の位置だけで出す
+  if (swN > 0 && CONFIG.turnKneeFlex > 0) L = Math.min(L, 0.90 - CONFIG.turnKneeFlex * swN);
   if (airH > 0.05) L = 0.90 - 0.08 * sp - 0.28 * ix - 0.50 * bs - 0.78 * kz - 0.45 * tuck;   // コザックは脚をほぼ水平に
   var look = (spin && FV_LOOK[spin.trick]) || null;                  // ★v8.9
   if (look && look.layout) L += (1.02 - L) * (1 - spin.open);        // レイアウト：膝を伸ばし切る（骨 0.48×2）
@@ -5807,6 +5809,7 @@ function fvSkier(){
     var kq = CONFIG.turnKneeTogether * swN, kin = CONFIG.turnKneeIn * swN;
     var kmx = (knL.xg + knR.xg) / 2; kmx += (hip.xg - kmx) * kin;   // 膝は腰の下寄りに（すねで外へ逃がす）
     knL.xg += (kmx - 0.055 - knL.xg) * kq; knR.xg += (kmx + 0.055 - knR.xg) * kq;
+    var kfw = CONFIG.turnKneeFwd * swN; knL.z += kfw; knR.z += kfw;   // ★v8.16 膝を前（カメラ側）へ
   }
   // 腕とストック
   var hands, elbows, poles = [];
